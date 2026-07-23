@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import Chat from "./pages/Chat";
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -15,7 +16,6 @@ export default function App() {
     <>
       <Navbar />
       <Routes>
-
         <Route
           path="/"
           element={
@@ -49,6 +49,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute allowedRoles={["customer", "provider"]}>
+              <Chat />
             </ProtectedRoute>
           }
         />
