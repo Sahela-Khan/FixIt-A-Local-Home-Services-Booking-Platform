@@ -10,6 +10,8 @@ export default function Navbar() {
     navigate("/login");
   };
 
+  const canChat = user?.role === "customer" || user?.role === "provider";
+
   return (
     <header className="navbar">
       <Link className="brand" to={isAuthenticated ? roleHome(user?.role) : "/login"}>
@@ -18,6 +20,11 @@ export default function Navbar() {
 
       {isAuthenticated && (
         <div className="nav-right">
+          {canChat && (
+            <Link className="nav-link" to="/chat">
+              Messages
+            </Link>
+          )}
           <span className="nav-user">
             {user?.name}
             <span className={`role-chip role-${user?.role}`}>{user?.role}</span>
