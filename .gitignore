@@ -1,3 +1,6 @@
+# Local editor/tooling directories
+.claude/
+
 # Logs
 logs
 *.log
