@@ -2,6 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
+const MUTED = "mt-0 text-[0.95rem] text-ink-soft";
+const ALERT =
+  "mt-4 rounded-[7px] border border-danger-line bg-danger-bg px-[0.8rem] py-[0.6rem] text-[0.9rem] text-danger-text";
+const BTN_SMALL =
+  "cursor-pointer rounded-lg px-[0.85rem] py-[0.45rem] text-[0.85rem] font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none";
+const BTN_DARK = `${BTN_SMALL} bg-ink text-white hover:bg-[#33434f]`;
+const BTN_OUTLINE = `${BTN_SMALL} border border-line bg-transparent text-ink hover:border-ink`;
+const CHAT_ITEM =
+  "flex w-full cursor-pointer flex-col gap-[0.15rem] rounded-[7px] px-[0.7rem] py-[0.6rem] text-left";
+const BADGE =
+  "ml-[0.45rem] inline-block rounded-full px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em]";
+const BADGE_TONE = {
+  customer: "bg-[#e4edf6] text-[#2b5d8a]",
+  provider: "bg-[#fdeed3] text-[#a06a04]",
+  admin: "bg-ink text-white",
+};
+
 export default function Chat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -96,63 +113,84 @@ export default function Chat() {
     conversations.find((c) => c.id === activeId)?.name || "Conversation";
 
   return (
-    <div className="page">
-      <h2>Messages</h2>
-      <p className="muted">
+    <div className="mx-auto max-w-[1000px] px-6 py-10">
+      <h2 className="mb-1 text-2xl font-bold">Messages</h2>
+      <p className={MUTED}>
         Chat directly with the {user?.role === "customer" ? "providers" : "customers"} you work with.
       </p>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <div className={ALERT}>{error}</div>}
 
-      <div className="chat-layout">
-        <aside className="chat-list">
-          <button className="btn btn-small btn-dark chat-new" onClick={openContacts}>
+      <div className="mt-6 grid h-[520px] grid-cols-[260px_1fr] gap-5 max-[700px]:h-auto max-[700px]:grid-cols-1">
+        <aside className="flex flex-col gap-[0.4rem] overflow-y-auto rounded-lg border border-line bg-surface p-3 max-[700px]:max-h-[200px]">
+          <button
+            className={`${BTN_DARK} mb-[0.4rem] w-full`}
+            onClick={openContacts}
+          >
             New chat
           </button>
 
           {conversations.length === 0 && (
-            <p className="muted small chat-empty">No conversations yet.</p>
+            <p className="mt-4 text-center text-[0.8rem] text-ink-soft">
+              No conversations yet.
+            </p>
           )}
 
           {conversations.map((c) => (
             <button
               key={c.id}
-              className={c.id === activeId ? "chat-item chat-item-active" : "chat-item"}
+              className={
+                c.id === activeId
+                  ? `${CHAT_ITEM} border border-brand bg-[#f4f1ea]`
+                  : `${CHAT_ITEM} border border-transparent bg-transparent hover:bg-[#f4f1ea]`
+              }
               onClick={() => setActiveId(c.id)}
             >
-              <span className="chat-item-top">
-                <span className="chat-name">{c.name}</span>
-                {c.unread > 0 && <span className="chat-unread">{c.unread}</span>}
+              <span className="flex items-center justify-between gap-[0.4rem]">
+                <span className="text-[0.92rem] font-semibold">{c.name}</span>
+                {c.unread > 0 && (
+                  <span className="rounded-full bg-brand px-[0.4rem] py-[0.05rem] text-[0.7rem] font-bold text-ink">
+                    {c.unread}
+                  </span>
+                )}
               </span>
-              <span className="chat-preview">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.8rem] text-ink-soft">
                 {c.lastMessage || "No messages yet"}
               </span>
             </button>
           ))}
         </aside>
 
-        <section className="chat-thread">
+        <section className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface max-[700px]:h-[420px]">
           {!activeId ? (
-            <p className="muted chat-placeholder">
+            <p className="m-auto text-[0.95rem] text-ink-soft">
               Select a conversation or start a new one.
             </p>
           ) : (
             <>
-              <header className="chat-header">{activeName}</header>
+              <header className="border-b border-line bg-[#fbfaf7] px-[1.1rem] py-[0.8rem] font-bold">
+                {activeName}
+              </header>
 
-              <div className="chat-messages">
+              <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-[1.1rem] py-4">
                 {messages.length === 0 && (
-                  <p className="muted small">Say hello to start the conversation.</p>
+                  <p className="mb-0 mt-[0.4rem] text-[0.8rem] text-ink-soft">
+                    Say hello to start the conversation.
+                  </p>
                 )}
                 {messages.map((m) => {
                   const mine = m.sender?._id === user?.id;
                   return (
                     <div
                       key={m._id}
-                      className={mine ? "bubble bubble-mine" : "bubble bubble-them"}
+                      className={
+                        mine
+                          ? "flex max-w-[70%] flex-col gap-[0.2rem] self-end rounded-xl rounded-br-[3px] bg-brand px-[0.8rem] py-[0.55rem] text-ink"
+                          : "flex max-w-[70%] flex-col gap-[0.2rem] self-start rounded-xl rounded-bl-[3px] bg-[#eeeae2] px-[0.8rem] py-[0.55rem] text-ink"
+                      }
                     >
-                      <span className="bubble-text">{m.content}</span>
-                      <span className="bubble-time">
+                      <span className="break-words text-[0.92rem]">{m.content}</span>
+                      <span className="self-end text-[0.68rem] opacity-70">
                         {new Date(m.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -164,8 +202,12 @@ export default function Chat() {
                 <div ref={bottomRef} />
               </div>
 
-              <form className="chat-composer" onSubmit={send}>
+              <form
+                className="flex gap-2 border-t border-line p-3"
+                onSubmit={send}
+              >
                 <input
+                  className="flex-1 rounded-[7px] border border-line bg-white px-[0.8rem] py-[0.6rem] text-ink focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/20"
                   type="text"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -173,7 +215,7 @@ export default function Chat() {
                   maxLength={1000}
                 />
                 <button
-                  className="btn btn-small btn-primary chat-send"
+                  className={`${BTN_SMALL} w-auto bg-brand text-ink hover:bg-brand-dark hover:text-white disabled:cursor-wait disabled:opacity-60`}
                   type="submit"
                   disabled={sending || !draft.trim()}
                 >
@@ -186,23 +228,34 @@ export default function Chat() {
       </div>
 
       {showContacts && (
-        <div className="modal-backdrop" onClick={() => setShowContacts(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Start a new chat</h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4"
+          onClick={() => setShowContacts(false)}
+        >
+          <div
+            className="w-full max-w-[400px] rounded-lg bg-surface p-6 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="m-0 mb-2 text-[1.17rem] font-bold">Start a new chat</h3>
             {contacts.length === 0 ? (
-              <p className="muted">
+              <p className={MUTED}>
                 No {user?.role === "customer" ? "providers" : "customers"} are registered yet.
               </p>
             ) : (
-              <ul className="contact-list">
+              <ul className="m-0 mt-2 list-none p-0">
                 {contacts.map((c) => (
-                  <li key={c._id}>
+                  <li
+                    className="flex items-center justify-between border-b border-line py-2 text-[0.92rem] last:border-b-0"
+                    key={c._id}
+                  >
                     <span>
                       {c.name}
-                      <span className={`badge badge-${c.role}`}>{c.role}</span>
+                      <span className={`${BADGE} ${BADGE_TONE[c.role] || ""}`}>
+                        {c.role}
+                      </span>
                     </span>
                     <button
-                      className="btn btn-small btn-outline"
+                      className={BTN_OUTLINE}
                       onClick={() => startChat(c._id)}
                     >
                       Chat
@@ -211,9 +264,9 @@ export default function Chat() {
                 ))}
               </ul>
             )}
-            <div className="modal-actions">
+            <div className="mt-[1.4rem] flex justify-end gap-[0.6rem]">
               <button
-                className="btn btn-small btn-outline"
+                className={BTN_OUTLINE}
                 onClick={() => setShowContacts(false)}
               >
                 Close

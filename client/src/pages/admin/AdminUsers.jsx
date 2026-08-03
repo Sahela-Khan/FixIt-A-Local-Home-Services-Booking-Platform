@@ -2,6 +2,31 @@ import { useEffect, useState } from "react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
+const FIELD =
+  "rounded-[7px] border border-line bg-white px-[0.8rem] py-[0.55rem] text-ink focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/20";
+const MODAL_FIELD =
+  "w-full rounded-[7px] border border-line bg-white px-[0.8rem] py-[0.6rem] text-ink focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/20 disabled:bg-[#f1efe9] disabled:text-ink-soft";
+const MODAL_LABEL = "mb-[0.3rem] mt-[0.9rem] block text-[0.85rem] font-semibold";
+const ALERT =
+  "mt-4 rounded-[7px] border border-danger-line bg-danger-bg px-[0.8rem] py-[0.6rem] text-[0.9rem] text-danger-text";
+const MUTED = "mt-0 text-[0.95rem] text-ink-soft";
+const TABLE =
+  "w-full border-collapse overflow-hidden rounded-lg border border-line bg-surface text-[0.92rem] max-[700px]:block max-[700px]:overflow-x-auto";
+const TH = "bg-ink px-[0.9rem] py-[0.65rem] text-left font-semibold text-white";
+const TD = "border-t border-line px-[0.9rem] py-[0.65rem] align-middle";
+const BADGE =
+  "ml-[0.45rem] inline-block rounded-full px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em]";
+const BADGE_TONE = {
+  customer: "bg-[#e4edf6] text-[#2b5d8a]",
+  provider: "bg-[#fdeed3] text-[#a06a04]",
+  admin: "bg-ink text-white",
+};
+const BTN_SMALL =
+  "cursor-pointer rounded-lg px-[0.85rem] py-[0.45rem] text-[0.85rem] font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none";
+const BTN_DARK = `${BTN_SMALL} bg-ink text-white hover:bg-[#33434f] disabled:cursor-wait disabled:opacity-60`;
+const BTN_OUTLINE = `${BTN_SMALL} border border-line bg-transparent text-ink hover:border-ink disabled:cursor-default disabled:opacity-45 disabled:hover:border-line`;
+const BTN_DANGER = `${BTN_SMALL} bg-[#c0392b] text-white hover:bg-[#a03024] disabled:cursor-wait disabled:opacity-60`;
+
 export default function AdminUsers() {
   const { user: me } = useAuth();
   const [searchInput, setSearchInput] = useState("");
@@ -78,14 +103,16 @@ export default function AdminUsers() {
 
   return (
     <>
-      <form className="toolbar" onSubmit={handleSearch}>
+      <form className="mb-5 flex flex-wrap gap-[0.6rem]" onSubmit={handleSearch}>
         <input
+          className={`${FIELD} min-w-[200px] flex-1`}
           type="text"
           placeholder="Search by name or email"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
         <select
+          className={FIELD}
           value={query.role}
           onChange={(e) =>
             setQuery((q) => ({ ...q, role: e.target.value, page: 1 }))
@@ -96,45 +123,53 @@ export default function AdminUsers() {
           <option value="provider">Providers</option>
           <option value="admin">Admins</option>
         </select>
-        <button className="btn btn-small btn-dark" type="submit">
+        <button className={BTN_DARK} type="submit">
           Search
         </button>
       </form>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <div className={ALERT}>{error}</div>}
       {loading ? (
-        <p className="muted">Loading users…</p>
+        <p className={MUTED}>Loading users…</p>
       ) : (
         <>
-          <table className="table">
+          <table className={TABLE}>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Joined</th>
-                <th>Actions</th>
+                <th className={TH}>Name</th>
+                <th className={TH}>Email</th>
+                <th className={TH}>Phone</th>
+                <th className={TH}>Role</th>
+                <th className={TH}>Joined</th>
+                <th className={TH}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {data.users.map((u) => (
-                <tr key={u._id}>
-                  <td>
+                <tr className="even:bg-[#fbfaf7]" key={u._id}>
+                  <td className={TD}>
                     {u.name}
-                    {u._id === me?.id && <span className="you-tag">you</span>}
+                    {u._id === me?.id && (
+                      <span className="ml-[0.45rem] rounded-full bg-brand px-[0.45rem] py-[0.1rem] text-[0.68rem] font-bold uppercase text-ink">
+                        you
+                      </span>
+                    )}
                   </td>
-                  <td>{u.email}</td>
-                  <td>{u.phone}</td>
-                  <td>
-                    <span className={`badge badge-${u.role}`}>{u.role}</span>
+                  <td className={TD}>{u.email}</td>
+                  <td className={TD}>{u.phone}</td>
+                  <td className={TD}>
+                    <span className={`${BADGE} ${BADGE_TONE[u.role] || ""}`}>
+                      {u.role}
+                    </span>
                   </td>
-                  <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <div className="row-actions">
+                  <td className={TD}>
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className={TD}>
+                    <div className="flex gap-[0.4rem]">
                       {(u.role !== "admin" || u._id === me?.id) && (
                         <button
-                          className="btn btn-small btn-outline"
+                          className={BTN_OUTLINE}
                           onClick={() => openEdit(u)}
                         >
                           Edit
@@ -142,7 +177,7 @@ export default function AdminUsers() {
                       )}
                       {u.role !== "admin" && (
                         <button
-                          className="btn btn-small btn-danger"
+                          className={BTN_DANGER}
                           onClick={() => removeUser(u)}
                         >
                           Delete
@@ -156,22 +191,22 @@ export default function AdminUsers() {
           </table>
 
           {data.users.length === 0 && (
-            <p className="muted">No users match this search.</p>
+            <p className={MUTED}>No users match this search.</p>
           )}
 
-          <div className="pagination">
+          <div className="mt-5 flex items-center gap-4">
             <button
-              className="btn btn-small btn-outline"
+              className={BTN_OUTLINE}
               disabled={data.page <= 1}
               onClick={() => setQuery((q) => ({ ...q, page: q.page - 1 }))}
             >
               Previous
             </button>
-            <span className="muted">
+            <span className={MUTED}>
               Page {data.page} of {data.pages} ({data.total} users)
             </span>
             <button
-              className="btn btn-small btn-outline"
+              className={BTN_OUTLINE}
               disabled={data.page >= data.pages}
               onClick={() => setQuery((q) => ({ ...q, page: q.page + 1 }))}
             >
@@ -182,17 +217,21 @@ export default function AdminUsers() {
       )}
 
       {editing && (
-        <div className="modal-backdrop" onClick={() => setEditing(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4"
+          onClick={() => setEditing(null)}
+        >
           <form
-            className="modal"
+            className="w-full max-w-[400px] rounded-lg bg-surface p-6 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
             onClick={(e) => e.stopPropagation()}
             onSubmit={saveEdit}
           >
-            <h3>Edit user</h3>
-            {editError && <div className="alert">{editError}</div>}
+            <h3 className="m-0 mb-2 text-[1.17rem] font-bold">Edit user</h3>
+            {editError && <div className={ALERT}>{editError}</div>}
 
-            <label htmlFor="edit-name">Name</label>
+            <label className={MODAL_LABEL} htmlFor="edit-name">Name</label>
             <input
+              className={MODAL_FIELD}
               id="edit-name"
               type="text"
               value={editing.name}
@@ -200,8 +239,9 @@ export default function AdminUsers() {
               required
             />
 
-            <label htmlFor="edit-phone">Phone</label>
+            <label className={MODAL_LABEL} htmlFor="edit-phone">Phone</label>
             <input
+              className={MODAL_FIELD}
               id="edit-phone"
               type="tel"
               value={editing.phone}
@@ -211,8 +251,9 @@ export default function AdminUsers() {
               required
             />
 
-            <label htmlFor="edit-role">Role</label>
+            <label className={MODAL_LABEL} htmlFor="edit-role">Role</label>
             <select
+              className={MODAL_FIELD}
               id="edit-role"
               value={editing.role}
               disabled={editing.id === me?.id}
@@ -223,22 +264,20 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
             </select>
             {editing.id === me?.id && (
-              <p className="muted small">You cannot change your own role.</p>
+              <p className="mb-0 mt-[0.4rem] text-[0.8rem] text-ink-soft">
+                You cannot change your own role.
+              </p>
             )}
 
-            <div className="modal-actions">
+            <div className="mt-[1.4rem] flex justify-end gap-[0.6rem]">
               <button
                 type="button"
-                className="btn btn-small btn-outline"
+                className={BTN_OUTLINE}
                 onClick={() => setEditing(null)}
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="btn btn-small btn-dark"
-                disabled={saving}
-              >
+              <button type="submit" className={BTN_DARK} disabled={saving}>
                 {saving ? "Saving…" : "Save changes"}
               </button>
             </div>
