@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth, roleHome } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -11,10 +11,12 @@ import Chat from "./pages/Chat";
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
+  const { pathname } = useLocation();
+  const hasOwnSidebar = pathname.startsWith("/admin");
 
   return (
     <>
-      <Navbar />
+      {!hasOwnSidebar && <Navbar />}
       <Routes>
         <Route
           path="/"
