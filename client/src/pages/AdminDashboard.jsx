@@ -3,6 +3,7 @@ import AdminSidebar from "../components/AdminSidebar";
 import AdminOverview from "./admin/AdminOverview";
 import AdminUsers from "./admin/AdminUsers";
 import AdminApprovals from "./admin/AdminApprovals";
+import AdminCoupons from "./admin/AdminCoupons";
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("Overview");
@@ -10,6 +11,7 @@ export default function AdminDashboard() {
   const renderContent = () => {
     if (tab === "Users") return <AdminUsers />;
     if (tab === "Approvals") return <AdminApprovals />;
+    if (tab === "Coupons") return <AdminCoupons />;
     return <AdminOverview />;
   };
 
