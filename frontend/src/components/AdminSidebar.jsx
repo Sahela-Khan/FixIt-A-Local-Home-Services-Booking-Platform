@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ClipboardCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardCheck, ShieldAlert, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,6 +15,7 @@ export default function AdminSidebar({ activeTab, setActiveTab }) {
     { name: "Overview", icon: LayoutDashboard, tab: "Overview" },
     { name: "Users", icon: Users, tab: "Users" },
     { name: "Approvals", icon: ClipboardCheck, tab: "Approvals" },
+    { name: "Disputes", icon: ShieldAlert, tab: "Disputes" },
   ];
 
   return (
