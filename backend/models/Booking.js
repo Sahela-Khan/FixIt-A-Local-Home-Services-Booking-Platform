@@ -23,9 +23,7 @@ const bookingSchema = new mongoose.Schema(
     address: { type: String, required: true },
     notes: { type: String },
     amount: { type: Number, required: true },
-    // The service's normal price before any loyalty discount was applied
     originalAmount: { type: Number },
-    // True if this booking got the 50%-off loyalty reward (100,000+ points)
     loyaltyDiscountApplied: { type: Boolean, default: false },
     status: {
       type: String,
@@ -37,24 +35,32 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Pending", "Paid", "Refunded"],
       default: "Pending",
     },
-    // Loyalty points awarded to the customer when this booking was placed
     loyaltyPointsAwarded: { type: Number, default: 0 },
-    // Loyalty points deducted from the customer if this booking was cancelled
     loyaltyPointsDeducted: { type: Number, default: 0 },
-    // What % of the amount was refunded on cancellation (0, 50, or 100)
     refundPercent: { type: Number, default: null },
     cancelReason: { type: String },
     cancelledBy: { type: String, enum: ["customer", "provider", null], default: null },
     cancelledAt: { type: Date },
-    // Set when one party raises a no-show claim; resolution logic lives in
-    // bookingController.flagNoShow (FR-21.3)
+    // Set automatically (see pre-save hook below) the first time status
+    // moves away from "Booked" — i.e. the moment the provider accepts.
+    // Used to calculate the day-based cancellation penalty.
+    confirmedAt: { type: Date, default: null },
     noShowFlaggedBy: { type: String, enum: ["customer", "provider", null], default: null },
     noShowConfirmed: { type: Boolean, default: false },
-    // Whether the customer chose to save this provider after job completion
     providerSavedPrompted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
+
+// Auto-stamp confirmedAt the first time the status leaves "Booked" —
+// this works no matter which controller changes the status (provider
+// accept flow, admin, etc.), since it's enforced at the model level.
+bookingSchema.pre("save", function (next) {
+  if (this.isModified("status") && this.status !== "Booked" && !this.confirmedAt) {
+    this.confirmedAt = new Date();
+  }
+  next();
+});
 
 bookingSchema.set("toJSON", {
   transform: (doc, ret) => {

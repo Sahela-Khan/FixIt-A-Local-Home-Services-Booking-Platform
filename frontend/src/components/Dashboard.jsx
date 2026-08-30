@@ -24,16 +24,16 @@ function refundHintFor(booking) {
 }
 
 export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [expandedId, setExpandedId] = useState(null); // which row's service name was clicked (shows details)
+  const [expandedId, setExpandedId] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
-  // Modal state — replaces window.alert / window.prompt / window.confirm
   const [modal, setModal] = useState({ open: false, type: "message", title: "", message: "" });
-  const [cancelTarget, setCancelTarget] = useState(null); // booking currently being confirmed for cancel
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
@@ -73,7 +73,8 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
     if (!cancelTarget) return;
     setCancellingId(cancelTarget._id);
     try {
-      await api.put(`/bookings/${cancelTarget._id}/cancel`, { reason: cancelReason });
+      const res = await api.put(`/bookings/${cancelTarget._id}/cancel`, { reason: cancelReason });
+      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
       setCancelTarget(null);
       setExpandedId(null);
       loadBookings();
@@ -133,7 +134,9 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         ))}
       </div>
 
-      {/* Merged Current + Upcoming table */}
+      {/* Upcoming Booking table — shows Amount instead of a Pay action,
+          since paying is only possible once a booking is Completed
+          (those live in the History table below). */}
       <div className="bg-white rounded-xl p-5 shadow-sm mb-6">
         <h3 className="font-semibold mb-3">Upcoming Booking</h3>
 
@@ -152,13 +155,13 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                 <th>Provider</th>
                 <th>Date</th>
                 <th>Booking Progress</th>
-                <th>Pay</th>
+                <th>Amount</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {activeBookings.map((b, index) => {
-                const isCurrent = index === 0; // earliest booking = "current"
+                const isCurrent = index === 0;
                 const isExpanded = expandedId === b._id;
                 return (
                   <Fragment key={b._id}>
@@ -184,20 +187,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                           {b.status}
                         </span>
                       </td>
-                      <td className="py-3 pr-2">
-                        <button
-                          onClick={() => handlePay(b)}
-                          disabled={payingId === b._id || b.paymentStatus === "Paid"}
-                          className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-                        >
-                          <CreditCard size={12} />
-                          {b.paymentStatus === "Paid"
-                            ? "Paid"
-                            : payingId === b._id
-                            ? "Paying..."
-                            : `Pay ৳${b.amount} now`}
-                        </button>
-                      </td>
+                      <td className="py-3 pr-2 font-semibold">৳ {b.amount}</td>
                       <td className="py-3 text-right">
                         <button
                           onClick={() => openCancelConfirm(b)}
@@ -238,21 +228,37 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         )}
       </div>
 
+      {/* Booking History table — collapsible via the chevron next to the
+          heading. Shows Pay instead of plain Amount: Completed bookings get
+          the Pay button/Paid badge, Cancelled bookings show
+          Refunded / Not Refunded based on paymentStatus. */}
       <div className="bg-white rounded-xl p-5 shadow-sm">
-        <h3 className="font-semibold mb-3">📄 My Booking History</h3>
-        {!loading && historyBookings.length === 0 && (
+        <button
+          onClick={() => setHistoryOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between mb-3"
+        >
+          <h3 className="font-semibold">📄 My Booking History</h3>
+          {historyOpen ? (
+            <ChevronUp size={18} className="text-slate-400" />
+          ) : (
+            <ChevronDown size={18} className="text-slate-400" />
+          )}
+        </button>
+
+        {historyOpen && !loading && historyBookings.length === 0 && (
           <p className="text-sm text-slate-400">
             No bookings yet. Once a booking is completed or cancelled, it will show up here.
           </p>
         )}
-        {historyBookings.length > 0 && (
+
+        {historyOpen && historyBookings.length > 0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b">
                 <th className="pb-2">Service</th>
                 <th>Provider</th>
                 <th>Date</th>
-                <th>Amount</th>
+                <th>Pay</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -263,7 +269,32 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                   <td className="py-2">{h.service}</td>
                   <td>{h.provider}</td>
                   <td>{h.date}</td>
-                  <td>৳ {h.amount}</td>
+                  <td>
+                    {h.status === "Completed" ? (
+                      <button
+                        onClick={() => handlePay(h)}
+                        disabled={payingId === h._id || h.paymentStatus === "Paid"}
+                        className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                      >
+                        <CreditCard size={12} />
+                        {h.paymentStatus === "Paid"
+                          ? "Paid"
+                          : payingId === h._id
+                          ? "Paying..."
+                          : `Pay ৳${h.amount} now`}
+                      </button>
+                    ) : (
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          h.paymentStatus === "Refunded"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {h.paymentStatus === "Refunded" ? "Refunded" : "Not Refunded"}
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -293,7 +324,6 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         )}
       </div>
 
-      {/* Simple message modal (replaces alert()) */}
       <AppModal
         open={modal.open}
         type="message"
@@ -302,7 +332,6 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         onClose={closeModal}
       />
 
-      {/* Cancel confirmation modal (replaces prompt()/confirm()) */}
       <AppModal
         open={Boolean(cancelTarget)}
         type="confirm"

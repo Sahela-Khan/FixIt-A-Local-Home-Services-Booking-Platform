@@ -8,7 +8,7 @@ const categories = ["All", "Cleaning", "Plumbing", "AC Repair", "Painting", "Ele
 const maxPossiblePrice = 5000;
 
 export default function SearchAndBook() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [services, setServices] = useState([]);
   const [locations, setLocations] = useState(["All"]);
@@ -30,7 +30,6 @@ export default function SearchAndBook() {
 
   const [formError, setFormError] = useState("");
 
-  // Manual "Book a Service" modal — customer types provider + service name freely
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [providerText, setProviderText] = useState("");
   const [serviceText, setServiceText] = useState("");
@@ -112,24 +111,23 @@ export default function SearchAndBook() {
     setFormError("");
     setBooking(true);
     try {
-      await api.post("/bookings", {
+      const res = await api.post("/bookings", {
         serviceId: service._id,
         date,
         time,
         address,
         notes,
       });
+      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
       setConfirmedFor(service);
       setExpandedServiceId(null);
     } catch (err) {
-      // ✅ FIXED: setFormError instead of alert
       setFormError(err.response?.data?.message || "Could not create booking.");
     } finally {
       setBooking(false);
     }
   };
 
-  // ---- Manual booking modal helpers ----
   const openManualModal = () => {
     setManualModalOpen(true);
     setProviderText("");
@@ -176,13 +174,14 @@ export default function SearchAndBook() {
     setManualError("");
     setManualBooking(true);
     try {
-      await api.post("/bookings", {
+      const res = await api.post("/bookings", {
         serviceId: matchedService._id,
         date: manualDate,
         time: manualTime,
         address: manualAddress,
         notes: manualNotes,
       });
+      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
       setManualConfirmed(matchedService);
       loadServices();
     } catch (err) {
@@ -352,7 +351,6 @@ export default function SearchAndBook() {
 
               {isExpanded && (
                 <div className="border-t mt-4 pt-4">
-                  {/* ✅ FIXED: formError moved outside the paragraph */}
                   {formError && (
                     <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
                       {formError}

@@ -5,10 +5,8 @@ const { notify } = require("./notificationController");
 
 // Determine refund % based on booking status and how close the job is
 function calculateRefundPercent(booking) {
-  // Provider has not accepted yet -> full refund
   if (booking.status === "Booked") return 100;
 
-  // Provider has accepted (Confirmed / En Route / In Progress) -> check time remaining
   const jobDateTime = new Date(`${booking.date} ${booking.time}`);
   const now = new Date();
   const hoursRemaining = (jobDateTime - now) / (1000 * 60 * 60);
@@ -17,25 +15,19 @@ function calculateRefundPercent(booking) {
   return 0;
 }
 
-// --- LOYALTY FEATURE DISABLED ---
-// Loyalty penalty helper (FR-21.4) — DISABLED
-// async function calculateLoyaltyPenalty(customerId, wasAfterAcceptance) {
-//   if (!wasAfterAcceptance) return 0;
-//
-//   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-//   const recentCancelCount = await Booking.countDocuments({
-//     customerId,
-//     status: "Cancelled",
-//     cancelledBy: "customer",
-//     cancelledAt: { $gte: ninetyDaysAgo },
-//   });
-//   const cancelNumber = recentCancelCount + 1;
-//   return Math.min(30, cancelNumber * 10);
-// }
+// Loyalty penalty rule:
+// - If the provider hadn't confirmed yet (status still "Booked") -> no penalty at all.
+// - If the provider had confirmed -> penalty = 3 points per day that passed
+//   since confirmation, up to the moment of cancellation.
+function calculateLoyaltyPenalty(booking) {
+  const wasAfterConfirmation = booking.status !== "Booked" && booking.confirmedAt;
+  if (!wasAfterConfirmation) return 0;
 
-// Simplified version: always returns 0
-async function calculateLoyaltyPenalty(customerId, wasAfterAcceptance) {
-  return 0; // Loyalty feature disabled
+  const now = new Date();
+  const msSinceConfirm = now - new Date(booking.confirmedAt);
+  const daysSinceConfirm = Math.max(1, Math.ceil(msSinceConfirm / (1000 * 60 * 60 * 24)));
+
+  return daysSinceConfirm * 3;
 }
 
 // @desc  Create a booking for the logged-in customer
@@ -62,7 +54,6 @@ exports.createBooking = async (req, res) => {
       return res.status(404).json({ message: "Customer not found." });
     }
 
-    // Default to the customer's registered address unless they typed a different one
     const finalAddress = (address && address.trim()) || customer.address || "";
     if (!finalAddress) {
       return res.status(400).json({
@@ -70,22 +61,12 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    // --- LOYALTY FEATURE DISABLED ---
-    // Loyalty points: DISABLED - always 0
-    // const priorBookingCount = await Booking.countDocuments({ customerId: req.user.id });
-    // const bookingNumber = priorBookingCount + 1;
-    // const pointsAwarded = bookingNumber * 5;
+    // Loyalty points: customer earns 5 points per booking, scaling with how
+    // many bookings they've made (1st = 5, 2nd = 10, 3rd = 15, ...)
+    const priorBookingCount = await Booking.countDocuments({ customerId: req.user.id });
+    const bookingNumber = priorBookingCount + 1;
+    const pointsAwarded = bookingNumber * 5;
 
-    // Loyalty reward: DISABLED - no discount
-    // const LOYALTY_REWARD_THRESHOLD = 100000;
-    // const loyaltyDiscountApplied = customer.loyaltyPoints >= LOYALTY_REWARD_THRESHOLD;
-    // const originalAmount = service.price;
-    // const finalAmount = loyaltyDiscountApplied
-    //   ? Math.round(originalAmount * 0.5)
-    //   : originalAmount;
-
-    // --- SIMPLIFIED: No loyalty, full price always ---
-    const pointsAwarded = 0;
     const loyaltyDiscountApplied = false;
     const originalAmount = service.price;
     const finalAmount = service.price;
@@ -106,10 +87,7 @@ exports.createBooking = async (req, res) => {
       loyaltyPointsAwarded: pointsAwarded,
     });
 
-    // --- LOYALTY FEATURE DISABLED ---
-    // Net point change: DISABLED - no points update
-    // const pointsChange = pointsAwarded - (loyaltyDiscountApplied ? LOYALTY_REWARD_THRESHOLD : 0);
-    // await User.findByIdAndUpdate(req.user.id, { $inc: { loyaltyPoints: pointsChange } });
+    await User.findByIdAndUpdate(req.user.id, { $inc: { loyaltyPoints: pointsAwarded } });
 
     await notify(
       service.provider._id,
@@ -118,15 +96,16 @@ exports.createBooking = async (req, res) => {
     );
     await notify(
       req.user.id,
-      // --- LOYALTY FEATURE DISABLED: Simplified notification ---
-      // loyaltyDiscountApplied
-      //   ? `Booking confirmed for ${service.title} — your 100,000 loyalty points unlocked 50% off (৳${originalAmount} → ৳${finalAmount}). You earned ${pointsAwarded} new points.`
-      //   : `Booking confirmed for ${service.title}. You earned ${pointsAwarded} loyalty points.`,
-      `Booking confirmed for ${service.title}.`,
+      `Booking confirmed for ${service.title}. You earned ${pointsAwarded} loyalty points.`,
       "booking_created"
     );
 
-    return res.status(201).json({ message: "Booking confirmed.", booking });
+    const updatedCustomer = await User.findById(req.user.id);
+    return res.status(201).json({
+      message: "Booking confirmed.",
+      booking,
+      loyaltyPoints: updatedCustomer.loyaltyPoints,
+    });
   } catch (err) {
     console.error("createBooking error:", err);
     return res.status(500).json({ message: "Server error while creating booking." });
@@ -150,7 +129,6 @@ exports.payNow = async (req, res) => {
     if (booking.status !== "Completed") {
       return res.status(400).json({ message: "Booking not completed" });
     }
-    // TODO: replace with a real SSLCommerz/Stripe session + IPN/webhook verification (Feature 12)
     booking.paymentStatus = "Paid";
     await booking.save();
     await notify(req.user.id, `Payment of ৳${booking.amount} for ${booking.service} was successful.`, "general");
@@ -194,15 +172,7 @@ exports.cancelBooking = async (req, res) => {
     }
 
     const refundPercent = calculateRefundPercent(booking);
-    
-    // --- LOYALTY FEATURE DISABLED ---
-    // FR-21.4: penalty-free if the provider hadn't accepted yet; capped and
-    // decaying (90-day window) otherwise.
-    // const wasAfterAcceptance = booking.status !== "Booked";
-    // const pointsPenalty = await calculateLoyaltyPenalty(req.user.id, wasAfterAcceptance);
-    
-    // --- SIMPLIFIED: No penalty ---
-    const pointsPenalty = 0;
+    const pointsPenalty = calculateLoyaltyPenalty(booking);
 
     booking.status = "Cancelled";
     booking.cancelReason = reason || "";
@@ -213,15 +183,11 @@ exports.cancelBooking = async (req, res) => {
     booking.paymentStatus = refundPercent > 0 ? "Refunded" : booking.paymentStatus;
     await booking.save();
 
-    // --- LOYALTY FEATURE DISABLED ---
-    // const customer = await User.findById(req.user.id);
-    // const newBalance = Math.max(0, (customer.loyaltyPoints || 0) - pointsPenalty);
-    // customer.loyaltyPoints = newBalance;
-    // await customer.save();
-
-    // Get customer name for notification
     const customer = await User.findById(req.user.id);
-    
+    const newBalance = Math.max(0, (customer.loyaltyPoints || 0) - pointsPenalty);
+    customer.loyaltyPoints = newBalance;
+    await customer.save();
+
     await notify(
       booking.providerId,
       `${customer?.name || 'Customer'} cancelled the ${booking.service} booking (${refundPercent}% refund).`,
@@ -229,16 +195,15 @@ exports.cancelBooking = async (req, res) => {
     );
     await notify(
       req.user.id,
-      // --- LOYALTY FEATURE DISABLED: Simplified notification ---
-      // `You cancelled ${booking.service}. Refund: ${refundPercent}%.${pointsPenalty > 0 ? ` ${pointsPenalty} loyalty points deducted.` : ""}`,
-      `You cancelled ${booking.service}. Refund: ${refundPercent}%.`,
+      `You cancelled ${booking.service}. Refund: ${refundPercent}%.${pointsPenalty > 0 ? ` ${pointsPenalty} loyalty points deducted.` : ""}`,
       "booking_cancelled"
     );
 
     return res.status(200).json({
       message: `Booking cancelled. Refund: ${refundPercent}%.`,
       booking,
-      loyaltyPointsDeducted: 0,
+      loyaltyPointsDeducted: pointsPenalty,
+      loyaltyPoints: customer.loyaltyPoints,
     });
   } catch (err) {
     console.error("cancelBooking error:", err);
