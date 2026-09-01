@@ -12,6 +12,7 @@ const providerRoutes = require("./routes/providerRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const refundRequestRoutes = require("./routes/refundRequestRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 
@@ -21,6 +22,9 @@ app.use(
   })
 );
 app.use(express.json({ limit: "12mb" }));
+// SSLCommerz posts its success/fail/cancel/ipn callbacks as regular HTML form
+// data, not JSON — this lets req.body.val_id etc. actually populate.
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", authRoutes);
@@ -33,6 +37,7 @@ app.use("/api/provider", providerRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/refund-requests", refundRequestRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/payment", paymentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

@@ -37,6 +37,10 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Pending", "Paid", "Refunded"],
       default: "Pending",
     },
+    // SSLCommerz transaction id for the most recent payment attempt on this
+    // booking (Feature 11). Used to validate the gateway's success/fail/
+    // cancel callback and to look the booking back up from it.
+    transactionId: { type: String },
     // Loyalty points awarded to the customer when this booking was placed
     loyaltyPointsAwarded: { type: Number, default: 0 },
     // Loyalty points deducted from the customer if this booking was cancelled

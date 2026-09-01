@@ -222,9 +222,6 @@ exports.updateBookingStatus = async (req, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found." });
 
     booking.status = status;
-    if (status === "Completed") {
-      booking.paymentStatus = "Paid";
-    }
     await booking.save();
     await notify(booking.customerId, `Your ${booking.service} booking is now: ${status} (scheduled ${booking.date} at ${booking.time}).`, "booking_status");
 

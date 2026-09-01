@@ -3,6 +3,8 @@ import { CheckCircle2, XCircle, Star, ClipboardList, MapPin, Calendar, Download,
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import AppModal from "./AppModal";
+import ComingSoon from "./ComingSoon";
+import featureFlags from "../config/featureFlags";
 
 const steps = ["Booked", "Confirmed", "En Route", "In Progress", "Completed"];
 
@@ -94,17 +96,19 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
   };
 
   const handlePay = async (booking) => {
-    if (booking.status !== "Completed") {
-      showMessage("Booking not completed", "You can only pay once the job has been marked Completed by the provider.");
-      return;
-    }
     setPayingId(booking._id);
     try {
-      await api.put(`/bookings/${booking._id}/pay`);
-      loadBookings();
+      const res = await api.post(`/payment/init/${booking._id}`);
+      if (res.data?.GatewayPageURL) {
+        // Send the browser to SSLCommerz's hosted payment page. The gateway
+        // will redirect back to /payment/result once the customer finishes.
+        window.location.href = res.data.GatewayPageURL;
+      } else {
+        showMessage("Payment failed", "Could not start the payment session. Please try again.");
+        setPayingId(null);
+      }
     } catch (err) {
       showMessage("Payment failed", err.response?.data?.message || "Something went wrong.");
-    } finally {
       setPayingId(null);
     }
   };
@@ -194,18 +198,28 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                         </span>
                       </td>
                       <td className="py-3 pr-2">
-                        <button
-                          onClick={() => handlePay(b)}
-                          disabled={payingId === b._id || b.paymentStatus === "Paid"}
-                          className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-                        >
-                          <CreditCard size={12} />
-                          {b.paymentStatus === "Paid"
-                            ? "Paid"
-                            : payingId === b._id
-                            ? "Paying..."
-                            : `Pay ৳${b.amount} now`}
-                        </button>
+                        {/* Feature 11 — Payment Integration. Held back for Sprint 3
+                            (see src/config/featureFlags.js). */}
+                        {featureFlags.payment ? (
+                          b.status === "Booked" ? (
+                            <span className="text-xs text-slate-400">Opens once accepted</span>
+                          ) : (
+                            <button
+                              onClick={() => handlePay(b)}
+                              disabled={payingId === b._id || b.paymentStatus === "Paid"}
+                              className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              <CreditCard size={12} />
+                              {b.paymentStatus === "Paid"
+                                ? "Paid"
+                                : payingId === b._id
+                                ? "Redirecting..."
+                                : `Pay ৳${b.amount} now`}
+                            </button>
+                          )
+                        ) : (
+                          <ComingSoon compact />
+                        )}
                       </td>
                       <td className="py-3 text-right">
                         <button
@@ -221,20 +235,32 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                       <tr>
                         <td colSpan={6} className="bg-slate-50 px-3 py-4 rounded-lg">
                           <p className="text-sm text-slate-500 mb-2">📍 {b.address}</p>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {steps.map((step, i) => (
-                              <span
-                                key={step}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  i <= getStepIndex(b.status)
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-slate-200 text-slate-400"
-                                }`}
-                              >
-                                {step}
-                              </span>
-                            ))}
-                          </div>
+                          {/* Feature 5 — Real-Time Job Status Tracker. Held back for
+                              Sprint 3 (see src/config/featureFlags.js). The status
+                              badge in the table column above still reflects the
+                              booking's real status; only this step-by-step visual
+                              is hidden. */}
+                          {featureFlags.statusTracker ? (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {steps.map((step, i) => (
+                                <span
+                                  key={step}
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    i <= getStepIndex(b.status)
+                                      ? "bg-orange-500 text-white"
+                                      : "bg-slate-200 text-slate-400"
+                                  }`}
+                                >
+                                  {step}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mb-2">
+                              <ComingSoon compact />
+                              <span className="ml-2 text-xs text-slate-400">Live step-by-step tracking</span>
+                            </div>
+                          )}
                           <p className="text-xs text-slate-500">{refundHintFor(b, partialRefundPercent)}</p>
                         </td>
                       </tr>
@@ -263,6 +289,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                 <th>Date</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th></th>
               </tr>
             </thead>
@@ -283,6 +310,36 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                     >
                       {h.status}
                     </span>
+                  </td>
+                  <td>
+                    {/* Feature 11 — Payment Integration. Held back for Sprint 3
+                        (see src/config/featureFlags.js). */}
+                    {featureFlags.payment ? (
+                      h.status === "Completed" && h.paymentStatus !== "Paid" ? (
+                        <button
+                          onClick={() => handlePay(h)}
+                          disabled={payingId === h._id}
+                          className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                        >
+                          <CreditCard size={12} />
+                          {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}
+                        </button>
+                      ) : (
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            h.paymentStatus === "Paid"
+                              ? "bg-green-100 text-green-700"
+                              : h.paymentStatus === "Refunded"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {h.paymentStatus}
+                        </span>
+                      )
+                    ) : (
+                      <ComingSoon compact />
+                    )}
                   </td>
                   <td>
                     {h.status === "Completed" && (

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { ClipboardList, CheckCircle2, Clock, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import ComingSoon from "./ComingSoon";
+import featureFlags from "../config/featureFlags";
 
 const statusColors = {
   online: "bg-green-500",
@@ -220,12 +222,20 @@ export default function ProviderOverview() {
                     <p className="text-sm text-slate-500">📅 {b.date} ⏰ {b.time} · Status: {b.status}</p>
                   </div>
                   {nextStatus[b.status] && (
-                    <button
-                      onClick={() => advanceStatus(b)}
-                      className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
-                    >
-                      Mark {nextStatus[b.status]}
-                    </button>
+                    // Feature 5 — Real-Time Job Status Tracker. Held back for
+                    // Sprint 3 (see src/config/featureFlags.js). Booking
+                    // acceptance (above) is unaffected — jobs will simply stay
+                    // at "Confirmed" until this flag is turned on.
+                    featureFlags.statusTracker ? (
+                      <button
+                        onClick={() => advanceStatus(b)}
+                        className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
+                      >
+                        Mark {nextStatus[b.status]}
+                      </button>
+                    ) : (
+                      <ComingSoon compact />
+                    )
                   )}
                 </div>
               ))}

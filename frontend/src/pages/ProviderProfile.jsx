@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { Upload, ShieldCheck, Clock, CheckCircle2, Circle, Lightbulb, ChevronRight, ChevronLeft, Star, XCircle, IdCard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import ComingSoon from "../components/ComingSoon";
+import featureFlags from "../config/featureFlags";
 
 const STEPS = [
   { n: 1, label: "Basic Info" },
@@ -112,6 +114,109 @@ export default function ProviderProfile({ embedded = false }) {
       <h2 className="text-2xl font-bold mb-1">My Profile Setup</h2>
       <p className="text-slate-500 mb-6">Complete your profile to get more bookings and build trust with customers.</p>
 
+      {/* Feature 1 — Service Provider Profile Setup: skills / experience / bio /
+          service area / photo. Held back for Sprint 3 (see src/config/featureFlags.js).
+          Identity verification below is a separate, required feature (gates admin
+          approval + search visibility) and stays active regardless of this flag. */}
+      {!featureFlags.providerProfileSetup ? (
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 bg-white rounded-xl shadow-sm p-6">
+            <ComingSoon
+              title="Profile setup — coming in Sprint 3"
+              description="Adding your skills, experience, bio, service area, and profile photo will be available soon."
+            />
+
+            <div className="mt-6 border-t pt-4">
+              <h4 className="font-semibold mb-1 flex items-center gap-2">
+                <IdCard size={16} className="text-orange-500" /> Identity Verification
+              </h4>
+              <p className="text-xs text-slate-500 mb-3">
+                Add your NID number and a photo of your NID so an admin can verify your account.
+                Only verified providers show up in customer search results.
+              </p>
+
+              <label className="text-xs font-semibold text-slate-500">NID Number</label>
+              <input
+                value={form.nidNumber}
+                onChange={(e) => setForm({ ...form, nidNumber: e.target.value })}
+                placeholder="e.g. 1990123456789"
+                disabled={verificationStatus === "verified" || verificationStatus === "pending"}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 mb-3 disabled:bg-slate-50 disabled:text-slate-400"
+              />
+
+              <input
+                ref={nidFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleNidPhotoChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => nidFileInputRef.current?.click()}
+                disabled={verificationStatus === "verified" || verificationStatus === "pending"}
+                className="w-full border border-dashed rounded-lg px-4 py-5 text-center text-sm text-slate-500 disabled:opacity-60"
+              >
+                <Upload size={18} className="mx-auto mb-1" />
+                {form.nidPhotoUrl ? "Change NID photo" : "Upload NID photo"}
+                <p className="text-xs text-slate-400 mt-1">JPG, PNG up to 2MB</p>
+              </button>
+              {form.nidPhotoUrl && (
+                <img src={form.nidPhotoUrl} alt="NID preview" className="mt-2 max-h-32 rounded-lg border" />
+              )}
+
+              {verificationStatus === "verified" && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <ShieldCheck size={16} /> Your account is verified. Your services are visible to customers.
+                </div>
+              )}
+
+              {verificationStatus === "pending" && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                  <Clock size={16} /> Verification request sent — waiting for admin review.
+                </div>
+              )}
+
+              {verificationStatus === "rejected" && (
+                <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <p className="flex items-center gap-2 font-semibold">
+                    <XCircle size={16} /> Verification request rejected
+                  </p>
+                  {verificationNote && <p className="mt-1 text-red-600">Reason: {verificationNote}</p>}
+                  <p className="mt-1 text-red-600">Update your NID details above and request again.</p>
+                </div>
+              )}
+
+              {verifyError && (
+                <p className="text-xs text-red-500 mt-3">{verifyError}</p>
+              )}
+
+              {(verificationStatus === "unverified" || verificationStatus === "rejected") && (
+                <button
+                  type="button"
+                  onClick={handleVerify}
+                  disabled={verifying || !form.nidNumber.trim() || !form.nidPhotoUrl}
+                  className="mt-4 w-full bg-orange-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50 disabled:bg-slate-300"
+                >
+                  {verifying ? "Sending request..." : "Get verified"}
+                </button>
+              )}
+              {verificationStatus === "unverified" && (!form.nidNumber.trim() || !form.nidPhotoUrl) && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Add your NID number and photo above to request verification.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-blue-50 rounded-xl p-4 flex gap-2">
+              <Lightbulb size={16} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700">Identity verification is available now — full profile customization arrives in Sprint 3.</p>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-3 gap-6">
         {/* Main wizard */}
         <div className="col-span-2 bg-white rounded-xl shadow-sm p-6">
@@ -377,6 +482,7 @@ export default function ProviderProfile({ embedded = false }) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

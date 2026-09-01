@@ -146,34 +146,8 @@ exports.createBooking = async (req, res) => {
   }
 };
 
-// @desc  Simulate paying for a booking (mock SSLCommerz/Stripe success callback —
-//        no real gateway credentials are wired up yet, this just flips paymentStatus)
-// @route PUT /api/bookings/:id/pay
-// @access Private (customer)
-exports.payNow = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
-    if (booking.customerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: "You can only pay for your own bookings." });
-    }
-    if (booking.paymentStatus === "Paid") {
-      return res.status(400).json({ message: "This booking is already paid." });
-    }
-    if (booking.status !== "Completed") {
-      return res.status(400).json({ message: "Booking not completed" });
-    }
-    // TODO: replace with a real SSLCommerz/Stripe session + IPN/webhook verification (Feature 12)
-    booking.paymentStatus = "Paid";
-    await booking.save();
-    await notify(req.user.id, `Payment of ৳${booking.amount} for ${booking.service} was successful.`, "general");
-    await notify(booking.providerId, `You've been paid ৳${booking.amount} for ${booking.service}.`, "general");
-    return res.status(200).json({ message: "Payment successful (simulated).", booking });
-  } catch (err) {
-    console.error("payNow error:", err);
-    return res.status(500).json({ message: "Server error while processing payment." });
-  }
-};
+// (Payment now lives in controllers/paymentController.js — the real
+// SSLCommerz integration for Feature 11.)
 
 // @desc  Get all bookings for the logged-in customer
 // @route GET /api/bookings/mine

@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import PaymentResult from "./pages/PaymentResult";
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -23,6 +24,15 @@ export default function App() {
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      <Route
+        path="/payment/result"
+        element={
+          <ProtectedRoute allowedRoles={["customer"]}>
+            <PaymentResult />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/dashboard"

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, Clock, XCircle, Upload } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import ComingSoon from "./ComingSoon";
+import featureFlags from "../config/featureFlags";
 
 export default function PaymentsRewardsCancellation() {
   const { user } = useAuth();
@@ -91,31 +93,39 @@ export default function PaymentsRewardsCancellation() {
 
       <div className="bg-white rounded-xl p-5 shadow-sm mb-6">
         <h3 className="font-semibold mb-3">Payment history</h3>
-        {bookings.length === 0 && <p className="text-sm text-slate-400">No payments yet.</p>}
-        {bookings.length > 0 && (
-          <table className="w-full text-sm">
-            <tbody>
-              {bookings.map((b) => (
-                <tr key={b._id} className="border-b last:border-0">
-                  <td className="py-2">{b.service}</td>
-                  <td>৳ {b.amount}</td>
-                  <td>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        b.paymentStatus === "Paid"
-                          ? "bg-green-100 text-green-700"
-                          : b.paymentStatus === "Refunded"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {b.paymentStatus}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Feature 11 — Payment Integration. Held back for Sprint 3
+            (see src/config/featureFlags.js). */}
+        {featureFlags.payment ? (
+          <>
+            {bookings.length === 0 && <p className="text-sm text-slate-400">No payments yet.</p>}
+            {bookings.length > 0 && (
+              <table className="w-full text-sm">
+                <tbody>
+                  {bookings.map((b) => (
+                    <tr key={b._id} className="border-b last:border-0">
+                      <td className="py-2">{b.service}</td>
+                      <td>৳ {b.amount}</td>
+                      <td>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            b.paymentStatus === "Paid"
+                              ? "bg-green-100 text-green-700"
+                              : b.paymentStatus === "Refunded"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {b.paymentStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        ) : (
+          <ComingSoon description="Online payment via SSLCommerz (bKash, Nagad, cards) will be available soon." />
         )}
       </div>
 
