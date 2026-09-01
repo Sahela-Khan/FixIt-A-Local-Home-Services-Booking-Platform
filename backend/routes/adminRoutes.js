@@ -13,5 +13,8 @@ router.delete("/users/:id", adminController.deleteUser);
 router.get("/services/pending", adminController.listPendingServices);
 router.put("/services/:id/approve", adminController.approveService);
 router.put("/services/:id/reject", adminController.rejectService);
+router.get("/providers/pending-verification", adminController.listPendingVerifications);
+router.put("/providers/:id/verify", adminController.approveVerification);
+router.put("/providers/:id/reject-verification", adminController.rejectVerification);
 
 module.exports = router;

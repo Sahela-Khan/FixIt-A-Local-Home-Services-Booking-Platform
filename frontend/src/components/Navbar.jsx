@@ -25,7 +25,7 @@ export default function Navbar() {
         className="text-2xl font-bold tracking-[-0.5px] text-white no-underline"
         to={isAuthenticated ? roleHome(user?.role) : "/login"}
       >
-        Fix<span className="text-orange-500">It</span>
+        Fix<span style={{ color: "#FF6A00" }}>It</span>
       </Link>
 
       {isAuthenticated && (

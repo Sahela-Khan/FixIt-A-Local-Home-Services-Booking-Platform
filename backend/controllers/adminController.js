@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Service = require("../models/Service");
+const { notify } = require("./notificationController");
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -205,3 +206,53 @@ const reviewService = (decision) => async (req, res) => {
 
 exports.approveService = reviewService("approved");
 exports.rejectService = reviewService("rejected");
+
+// ---------- PROVIDER VERIFICATION ----------
+
+exports.listPendingVerifications = async (req, res) => {
+  try {
+    const providers = await User.find({
+      role: "provider",
+      "providerProfile.verificationStatus": "pending",
+    }).sort({ updatedAt: 1 });
+    return res.json({ providers });
+  } catch (err) {
+    console.error("Pending verifications error:", err);
+    return res.status(500).json({ message: "Failed to load pending verifications." });
+  }
+};
+
+const reviewVerification = (decision) => async (req, res) => {
+  try {
+    if (!isValidId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid provider id." });
+    }
+    const provider = await User.findOne({ _id: req.params.id, role: "provider" });
+    if (!provider) return res.status(404).json({ message: "Provider not found." });
+    if (provider.providerProfile?.verificationStatus !== "pending") {
+      return res.status(409).json({
+        message: `This provider's verification is not pending (currently ${provider.providerProfile?.verificationStatus}).`,
+      });
+    }
+
+    provider.providerProfile.verificationStatus = decision;
+    provider.providerProfile.verificationNote = decision === "rejected" ? (req.body?.note || "") : "";
+    await provider.save();
+
+    await notify(
+      provider._id,
+      decision === "verified"
+        ? "Your provider account has been verified by the admin. Your services are now visible to customers."
+        : `Your verification request was rejected by the admin.${req.body?.note ? ` Reason: ${req.body.note}` : ""}`,
+      "general"
+    );
+
+    return res.json({ provider });
+  } catch (err) {
+    console.error("Review verification error:", err);
+    return res.status(500).json({ message: "Failed to update verification status." });
+  }
+};
+
+exports.approveVerification = reviewVerification("verified");
+exports.rejectVerification = reviewVerification("rejected");
