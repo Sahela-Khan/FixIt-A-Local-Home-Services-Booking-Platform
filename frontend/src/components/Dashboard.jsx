@@ -31,6 +31,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
 
   const [expandedId, setExpandedId] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [upcomingOpen, setUpcomingOpen] = useState(true);
 
   const [modal, setModal] = useState({ open: false, type: "message", title: "", message: "" });
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -138,16 +139,26 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
           since paying is only possible once a booking is Completed
           (those live in the History table below). */}
       <div className="bg-white rounded-xl p-5 shadow-sm mb-6">
-        <h3 className="font-semibold mb-3">Upcoming Booking</h3>
+        <button
+          onClick={() => setUpcomingOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between mb-3"
+        >
+          <h3 className="font-semibold">Upcoming Booking</h3>
+          {upcomingOpen ? (
+            <ChevronUp size={18} className="text-slate-400" />
+          ) : (
+            <ChevronDown size={18} className="text-slate-400" />
+          )}
+        </button>
 
-        {loading && <p className="text-sm text-slate-400">Loading...</p>}
-        {!loading && activeBookings.length === 0 && (
+        {upcomingOpen && loading && <p className="text-sm text-slate-400">Loading...</p>}
+        {upcomingOpen && !loading && activeBookings.length === 0 && (
           <p className="text-sm text-slate-400">
             No bookings yet. Go to "Search & Book" to create one!
           </p>
         )}
 
-        {activeBookings.length > 0 && (
+        {upcomingOpen && activeBookings.length > 0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b">
