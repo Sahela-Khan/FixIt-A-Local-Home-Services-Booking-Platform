@@ -125,7 +125,8 @@ export default function PaymentsRewardsCancellation() {
           You earn 5 points on your 1st booking, 10 on your 2nd, 15 on your 3rd — increasing by 5 every booking.
         </p>
         <p className="text-sm text-slate-500 mb-1">
-          Cancelling a booking costs 10 points on your 1st cancellation, 20 on your 2nd, 30 on your 3rd — increasing by 10 each time.
+          Cancelling a booking after the provider has confirmed it costs 3 points for every day that's
+          passed since confirmation (minimum 1 day). Cancelling before the provider confirms costs nothing.
         </p>
         <p className="text-sm text-slate-500">
           Reach 100,000 points and your next booking automatically gets 50% off — the discount is applied at checkout and 100,000 points are spent from your balance.

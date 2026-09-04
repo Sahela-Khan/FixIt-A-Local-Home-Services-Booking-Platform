@@ -67,9 +67,15 @@ exports.createBooking = async (req, res) => {
     const bookingNumber = priorBookingCount + 1;
     const pointsAwarded = bookingNumber * 5;
 
-    const loyaltyDiscountApplied = false;
+    // FR-18.3: reaching 100,000 points auto-applies 50% off this booking and
+    // spends 100,000 points from the balance (see the loyalty rules panel in
+    // PaymentsRewardsCancellation.jsx for the customer-facing description).
+    const LOYALTY_DISCOUNT_THRESHOLD = 100000;
+    const LOYALTY_DISCOUNT_COST = 100000;
+    const loyaltyDiscountApplied = customer.loyaltyPoints >= LOYALTY_DISCOUNT_THRESHOLD;
     const originalAmount = service.price;
-    const finalAmount = service.price;
+    const finalAmount = loyaltyDiscountApplied ? Math.round(service.price * 0.5) : service.price;
+    const pointsSpent = loyaltyDiscountApplied ? LOYALTY_DISCOUNT_COST : 0;
 
     const booking = await Booking.create({
       customerId: req.user.id,
@@ -87,7 +93,11 @@ exports.createBooking = async (req, res) => {
       loyaltyPointsAwarded: pointsAwarded,
     });
 
-    await User.findByIdAndUpdate(req.user.id, { $inc: { loyaltyPoints: pointsAwarded } });
+    // Net change: points earned from this booking minus any points spent on
+    // the auto-applied discount. pointsAwarded is always positive and
+    // loyaltyDiscountApplied was only set when the balance already covered
+    // the cost, so the resulting balance can never go negative here.
+    await User.findByIdAndUpdate(req.user.id, { $inc: { loyaltyPoints: pointsAwarded - pointsSpent } });
 
     await notify(
       service.provider._id,
@@ -96,7 +106,9 @@ exports.createBooking = async (req, res) => {
     );
     await notify(
       req.user.id,
-      `Booking confirmed for ${service.title}. You earned ${pointsAwarded} loyalty points.`,
+      loyaltyDiscountApplied
+        ? `Booking confirmed for ${service.title}. Your 100,000 loyalty points unlocked 50% off (৳${originalAmount} → ৳${finalAmount}). You earned ${pointsAwarded} new points.`
+        : `Booking confirmed for ${service.title}. You earned ${pointsAwarded} loyalty points.`,
       "booking_created"
     );
 

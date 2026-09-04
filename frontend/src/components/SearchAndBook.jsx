@@ -18,6 +18,7 @@ export default function SearchAndBook() {
   const [category, setCategory] = useState("All");
   const [location, setLocation] = useState("All");
   const [maxPrice, setMaxPrice] = useState(maxPossiblePrice);
+  const [sortBy, setSortBy] = useState("newest");
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   const [expandedServiceId, setExpandedServiceId] = useState(null);
@@ -46,7 +47,7 @@ export default function SearchAndBook() {
   const loadServices = () => {
     setLoading(true);
     api
-      .get("/services", { params: { keyword, category, location, maxPrice } })
+      .get("/services", { params: { keyword, category, location, maxPrice, sortBy } })
       .then((res) => setServices(res.data.services))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -78,7 +79,7 @@ export default function SearchAndBook() {
     const t = setTimeout(loadServices, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword, category, location, maxPrice]);
+  }, [keyword, category, location, maxPrice, sortBy]);
 
   const toggleSaved = async (providerId) => {
     try {
@@ -259,6 +260,17 @@ export default function SearchAndBook() {
             className="flex-1"
           />
         </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm bg-white"
+        >
+          <option value="newest">Newest</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="rating">Rating</option>
+        </select>
       </div>
 
       <div className="flex gap-2 mb-5">

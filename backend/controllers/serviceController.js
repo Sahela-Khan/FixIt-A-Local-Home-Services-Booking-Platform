@@ -6,7 +6,7 @@ const User = require("../models/User");
 // @access Private (customer)
 exports.listServices = async (req, res) => {
   try {
-    const { keyword, category, location, maxPrice } = req.query;
+    const { keyword, category, location, maxPrice, sortBy } = req.query;
 
     const filter = { approvalStatus: "approved", isActive: true };
     if (category && category !== "All") filter.category = category;
@@ -46,6 +46,26 @@ exports.listServices = async (req, res) => {
         (s) => s.provider?.providerProfile?.serviceArea === location
       );
     }
+
+    // Sort the filtered results. "newest" (the default) keeps the
+    // createdAt-desc order already applied by the DB query above;
+    // price and rating are re-sorted here since they depend on
+    // fields (price, provider.providerProfile.avgRating) that aren't
+    // practical to sort at the query level once the availability/
+    // verification/keyword filters above have already run in JS.
+    const sortOption = sortBy || "newest";
+    if (sortOption === "price-low") {
+      services.sort((a, b) => a.price - b.price);
+    } else if (sortOption === "price-high") {
+      services.sort((a, b) => b.price - a.price);
+    } else if (sortOption === "rating") {
+      services.sort(
+        (a, b) =>
+          (b.provider?.providerProfile?.avgRating || 0) -
+          (a.provider?.providerProfile?.avgRating || 0)
+      );
+    }
+    // "newest" needs no extra sort — already newest-first from the query.
 
     return res.status(200).json({ services });
   } catch (err) {
