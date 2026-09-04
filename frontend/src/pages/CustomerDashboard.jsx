@@ -1,48 +1,62 @@
-import { useState, useEffect } from "react";
-import { LayoutDashboard, Search, CreditCard, MessageSquareText, Bell, MessageCircle } from "lucide-react";
+import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Dashboard from "../components/Dashboard";
-import SearchAndBook from "../components/SearchAndBook";
-import PaymentsRewardsCancellation from "../components/PaymentsRewardsCancellation";
-import MyReviews from "../components/MyReviews";
-import Notifications from "../components/Notifications";
-import Chat from "./Chat";
-import api from "../api/axios";
+import BookingForm from "../components/BookingForm";
+import CancellationPolicy from "../components/CancellationPolicy";
+import SavedProviders from "../components/SavedProviders";
+import ProfileSettings from "../components/ProfileSettings";
+
+// import SearchServices from "../components/SearchServices"; // In progress — not ready yet
+// import LoyaltyPoints from "../components/LoyaltyPoints"; // In progress — not ready yet
+
+// Simple placeholder shown for features that are still being built
+function ComingSoon({ title }) {
+  return (
+    <div className="flex-1 bg-slate-50 p-8 flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-sm p-10 text-center max-w-md">
+        <h2 className="text-xl font-bold mb-2">{title}</h2>
+        <p className="text-slate-500">
+          🚧 This feature is currently in progress and will be available soon.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [reviewCount, setReviewCount] = useState(0);
+  const [selectedService, setSelectedService] = useState(null);
 
-  useEffect(() => {
-    api
-      .get("/reviews/mine")
-      .then((res) => setReviewCount(res.data.myReviews?.length || 0))
-      .catch(() => {});
-  }, []);
-
-  const menu = [
-    { name: "Dashboard", icon: LayoutDashboard, tab: "dashboard" },
-    { name: "Search & Book", icon: Search, tab: "search" },
-    { name: "Payments, Rewards & Cancellation", icon: CreditCard, tab: "payments" },
-    { name: "Ratings & Reviews", icon: MessageSquareText, tab: "reviews", badge: reviewCount },
-    { name: "Notifications", icon: Bell, tab: "notifications" },
-    { name: "Messages", icon: MessageCircle, tab: "chat" },
-  ];
+  const goToBooking = (service) => {
+    setSelectedService(service);
+    setActiveTab("booking");
+  };
 
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard setActiveTab={setActiveTab} reviewCount={reviewCount} />;
+        return <Dashboard setActiveTab={setActiveTab} />;
+
       case "search":
-        return <SearchAndBook />;
-      case "payments":
-        return <PaymentsRewardsCancellation />;
-      case "reviews":
-        return <MyReviews />;
-      case "notifications":
-        return <Notifications />;
-      case "chat":
-        return <Chat />;
+        // return <SearchServices onBook={goToBooking} />; // In progress
+        return <ComingSoon title="Search & Filter Services" />;
+
+      case "booking":
+        return <BookingForm selectedService={selectedService} />;
+
+      case "loyalty":
+        // return <LoyaltyPoints />; // In progress
+        return <ComingSoon title="Loyalty Points" />;
+
+      case "cancellation":
+        return <CancellationPolicy />;
+
+      case "saved":
+        return <SavedProviders setActiveTab={setActiveTab} />;
+
+      case "profile":
+        return <ProfileSettings />;
+
       default:
         return <Dashboard setActiveTab={setActiveTab} />;
     }
@@ -50,7 +64,7 @@ export default function CustomerDashboard() {
 
   return (
     <div className="flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} menu={menu} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       {renderContent()}
     </div>
   );

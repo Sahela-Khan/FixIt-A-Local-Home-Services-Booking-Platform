@@ -3,7 +3,7 @@ import axios from "axios";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const authHeader = () => {
-  const token = localStorage.getItem("fixit_token"); // fixed key
+  const token = localStorage.getItem("fixit_token"); 
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -160,7 +160,7 @@ export async function getProviderReviews() {
   }
 }
 
-// FR-8.1 — Accept/Reject an incoming booking request
+
 export async function respondToBooking(bookingId, action) {
   try {
     const res = await axios.patch(
@@ -175,7 +175,7 @@ export async function respondToBooking(bookingId, action) {
   }
 }
 
-// FR-6.2 / FR-8.4 — provider advances job status along the pipeline
+
 export async function updateJobStatus(bookingId, status) {
   try {
     const res = await axios.patch(
@@ -190,18 +190,18 @@ export async function updateJobStatus(bookingId, status) {
   }
 }
 
-// FR-16.1 — availability toggle (Online / Busy / Offline)
+
 export async function updateAvailability(status) {
-  // FIXED: use correct field name 'availability' and no mock fallback
+  
   const res = await axios.patch(
     `${API_BASE}/provider/availability`,
-    { availability: status }, // changed from { status }
+    { availability: status }, 
     { headers: authHeader() }
   );
   return res.data;
 }
 
-// FR-11.2 — provider responds to a review
+
 export async function replyToReview(reviewId, reply) {
   try {
     const res = await axios.patch(

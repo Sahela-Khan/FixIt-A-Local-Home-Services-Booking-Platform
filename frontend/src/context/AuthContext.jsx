@@ -34,15 +34,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const updateUser = (patch) => {
-    setUser((prev) => {
-      const updated = { ...prev, ...patch };
-      localStorage.setItem("fixit_user", JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const value = { token, user, isAuthenticated: Boolean(token), login, logout, updateUser };
+  const value = { token, user, isAuthenticated: Boolean(token), login, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

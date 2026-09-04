@@ -3,17 +3,17 @@ import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
 const FIELD =
-  "rounded-[7px] border border-slate-200 bg-white px-[0.8rem] py-[0.55rem] text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-[3px] focus:ring-orange-500/20";
+  "rounded-[7px] border border-line bg-white px-[0.8rem] py-[0.55rem] text-ink focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/20";
 const MODAL_FIELD =
-  "w-full rounded-[7px] border border-slate-200 bg-white px-[0.8rem] py-[0.6rem] text-slate-800 focus:border-orange-500 focus:outline-none focus:ring-[3px] focus:ring-orange-500/20 disabled:bg-[#f1efe9] disabled:text-slate-500";
+  "w-full rounded-[7px] border border-line bg-white px-[0.8rem] py-[0.6rem] text-ink focus:border-brand focus:outline-none focus:ring-[3px] focus:ring-brand/20 disabled:bg-[#f1efe9] disabled:text-ink-soft";
 const MODAL_LABEL = "mb-[0.3rem] mt-[0.9rem] block text-[0.85rem] font-semibold";
 const ALERT =
-  "mt-4 rounded-[7px] border border-red-200 bg-red-50 px-[0.8rem] py-[0.6rem] text-[0.9rem] text-red-600";
-const MUTED = "mt-0 text-[0.95rem] text-slate-500";
+  "mt-4 rounded-[7px] border border-danger-line bg-danger-bg px-[0.8rem] py-[0.6rem] text-[0.9rem] text-danger-text";
+const MUTED = "mt-0 text-[0.95rem] text-ink-soft";
 const TABLE =
-  "w-full border-collapse overflow-hidden rounded-lg border border-slate-200 bg-white text-[0.92rem] max-[700px]:block max-[700px]:overflow-x-auto";
+  "w-full border-collapse overflow-hidden rounded-lg border border-line bg-surface text-[0.92rem] max-[700px]:block max-[700px]:overflow-x-auto";
 const TH = "bg-ink px-[0.9rem] py-[0.65rem] text-left font-semibold text-white";
-const TD = "border-t border-slate-200 px-[0.9rem] py-[0.65rem] align-middle";
+const TD = "border-t border-line px-[0.9rem] py-[0.65rem] align-middle";
 const BADGE =
   "ml-[0.45rem] inline-block rounded-full px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em]";
 const BADGE_TONE = {
@@ -22,9 +22,9 @@ const BADGE_TONE = {
   admin: "bg-ink text-white",
 };
 const BTN_SMALL =
-  "cursor-pointer rounded-lg px-[0.85rem] py-[0.45rem] text-[0.85rem] font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-orange-500 motion-reduce:transition-none";
+  "cursor-pointer rounded-lg px-[0.85rem] py-[0.45rem] text-[0.85rem] font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none";
 const BTN_DARK = `${BTN_SMALL} bg-ink text-white hover:bg-[#33434f] disabled:cursor-wait disabled:opacity-60`;
-const BTN_OUTLINE = `${BTN_SMALL} border border-slate-200 bg-transparent text-slate-800 hover:border-ink disabled:cursor-default disabled:opacity-45 disabled:hover:border-slate-200`;
+const BTN_OUTLINE = `${BTN_SMALL} border border-line bg-transparent text-ink hover:border-ink disabled:cursor-default disabled:opacity-45 disabled:hover:border-line`;
 const BTN_DANGER = `${BTN_SMALL} bg-[#c0392b] text-white hover:bg-[#a03024] disabled:cursor-wait disabled:opacity-60`;
 
 export default function AdminUsers() {
@@ -150,7 +150,7 @@ export default function AdminUsers() {
                   <td className={TD}>
                     {u.name}
                     {u._id === me?.id && (
-                      <span className="ml-[0.45rem] rounded-full bg-orange-500 px-[0.45rem] py-[0.1rem] text-[0.68rem] font-bold uppercase text-slate-800">
+                      <span className="ml-[0.45rem] rounded-full bg-brand px-[0.45rem] py-[0.1rem] text-[0.68rem] font-bold uppercase text-ink">
                         you
                       </span>
                     )}
@@ -222,7 +222,7 @@ export default function AdminUsers() {
           onClick={() => setEditing(null)}
         >
           <form
-            className="w-full max-w-[400px] rounded-lg bg-white p-6 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+            className="w-full max-w-[400px] rounded-lg bg-surface p-6 shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
             onClick={(e) => e.stopPropagation()}
             onSubmit={saveEdit}
           >
@@ -264,7 +264,7 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
             </select>
             {editing.id === me?.id && (
-              <p className="mb-0 mt-[0.4rem] text-[0.8rem] text-slate-500">
+              <p className="mb-0 mt-[0.4rem] text-[0.8rem] text-ink-soft">
                 You cannot change your own role.
               </p>
             )}

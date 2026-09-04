@@ -8,7 +8,6 @@ export default function Register() {
     name: "",
     email: "",
     phone: "",
-    address: "",
     password: "",
     role: "customer",
   });
@@ -41,8 +40,8 @@ export default function Register() {
   const labelClass = "mb-[0.3rem] mt-4 block text-[0.85rem] font-semibold";
 
   return (
-    <div className="grid min-h-screen grid-cols-1 min-[820px]:grid-cols-[5fr_7fr] bg-ink bg-[image:repeating-linear-gradient(-45deg,transparent_0_26px,rgba(232,147,12,0.07)_26px_30px)]">
-      <aside className="sticky top-0 flex h-screen flex-col justify-center px-7 py-10 text-white min-[820px]:px-12 min-[820px]:py-16">
+    <div className="grid min-h-[calc(100vh-56px)] grid-cols-1 min-[820px]:grid-cols-[5fr_7fr]">
+      <aside className="flex flex-col justify-center bg-ink bg-[image:repeating-linear-gradient(-45deg,transparent_0_26px,rgba(232,147,12,0.07)_26px_30px)] px-7 py-10 text-white min-[820px]:px-12 min-[820px]:py-16">
         <h1 className="m-0 mb-[0.4rem] text-[2.2rem] font-extrabold tracking-[-1.5px] min-[820px]:text-5xl">
           Fix<span className="text-brand">It</span>
         </h1>
@@ -102,16 +101,6 @@ export default function Register() {
             id="phone" name="phone" type="tel" value={form.phone}
             onChange={handleChange} placeholder="01XXXXXXXXX" required
           />
-
-          <label className={labelClass} htmlFor="address">Address</label>
-          <input
-            className={fieldClass}
-            id="address" name="address" type="text" value={form.address}
-            onChange={handleChange} placeholder="House 12, Road 5, Dhanmondi, Dhaka"
-          />
-          <p className="mt-1 text-xs text-ink-soft">
-            Used to auto-fill your service address when booking. You can override it per booking.
-          </p>
 
           <label className={labelClass} htmlFor="password">Password</label>
           <input

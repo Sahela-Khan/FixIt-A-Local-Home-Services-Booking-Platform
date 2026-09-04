@@ -10,7 +10,7 @@ const BTN_SMALL =
 const BTN_DARK = `${BTN_SMALL} bg-ink text-white hover:bg-[#33434f]`;
 const BTN_OUTLINE = `${BTN_SMALL} border border-line bg-transparent text-ink hover:border-ink`;
 const CHAT_ITEM =
-  "flex w-full cursor-pointer flex-col gap-[0.3rem] rounded-[7px] px-[0.9rem] py-[0.85rem] text-left";
+  "flex w-full cursor-pointer flex-col gap-[0.15rem] rounded-[7px] px-[0.7rem] py-[0.6rem] text-left";
 const BADGE =
   "ml-[0.45rem] inline-block rounded-full px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em]";
 const BADGE_TONE = {
@@ -113,7 +113,7 @@ export default function Chat() {
     conversations.find((c) => c.id === activeId)?.name || "Conversation";
 
   return (
-    <div className="flex-1 px-8 py-10">
+    <div className="mx-auto max-w-[1000px] px-6 py-10">
       <h2 className="mb-1 text-2xl font-bold">Messages</h2>
       <p className={MUTED}>
         Chat directly with the {user?.role === "customer" ? "providers" : "customers"} you work with.
@@ -121,17 +121,17 @@ export default function Chat() {
 
       {error && <div className={ALERT}>{error}</div>}
 
-      <div className="mt-6 grid h-[calc(100vh-220px)] min-h-[480px] grid-cols-[340px_1fr] gap-5 max-[900px]:h-auto max-[900px]:grid-cols-1">
-        <aside className="flex flex-col gap-[0.5rem] overflow-y-auto rounded-lg border border-line bg-surface p-4 max-[900px]:max-h-[240px]">
+      <div className="mt-6 grid h-[520px] grid-cols-[260px_1fr] gap-5 max-[700px]:h-auto max-[700px]:grid-cols-1">
+        <aside className="flex flex-col gap-[0.4rem] overflow-y-auto rounded-lg border border-line bg-surface p-3 max-[700px]:max-h-[200px]">
           <button
-            className={`${BTN_DARK} mb-[0.5rem] w-full !py-3 !text-[1rem]`}
+            className={`${BTN_DARK} mb-[0.4rem] w-full`}
             onClick={openContacts}
           >
             New chat
           </button>
 
           {conversations.length === 0 && (
-            <p className="mt-6 text-center text-base text-ink-soft">
+            <p className="mt-4 text-center text-[0.8rem] text-ink-soft">
               No conversations yet.
             </p>
           )}
@@ -147,23 +147,23 @@ export default function Chat() {
               onClick={() => setActiveId(c.id)}
             >
               <span className="flex items-center justify-between gap-[0.4rem]">
-                <span className="text-[1.02rem] font-semibold">{c.name}</span>
+                <span className="text-[0.92rem] font-semibold">{c.name}</span>
                 {c.unread > 0 && (
-                  <span className="rounded-full bg-brand px-[0.5rem] py-[0.1rem] text-[0.78rem] font-bold text-ink">
+                  <span className="rounded-full bg-brand px-[0.4rem] py-[0.05rem] text-[0.7rem] font-bold text-ink">
                     {c.unread}
                   </span>
                 )}
               </span>
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.88rem] text-ink-soft">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.8rem] text-ink-soft">
                 {c.lastMessage || "No messages yet"}
               </span>
             </button>
           ))}
         </aside>
 
-        <section className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface max-[900px]:h-[420px]">
+        <section className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface max-[700px]:h-[420px]">
           {!activeId ? (
-            <p className="m-auto text-lg text-ink-soft">
+            <p className="m-auto text-[0.95rem] text-ink-soft">
               Select a conversation or start a new one.
             </p>
           ) : (
