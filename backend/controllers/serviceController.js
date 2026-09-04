@@ -8,15 +8,24 @@ exports.listServices = async (req, res) => {
   try {
     // --- SEARCH & FILTER FEATURE DISABLED ---
     // Returns all approved services regardless of filters
-    
-    const services = await Service.find({ 
-      approvalStatus: "approved", 
-      isActive: true 
-    })
-    .populate("provider", "name providerProfile")
-    .sort({ createdAt: -1 });
 
-    return res.status(200).json({ services });
+    const services = await Service.find({
+      approvalStatus: "approved",
+      isActive: true,
+    })
+      .populate("provider", "name providerProfile")
+      .sort({ createdAt: -1 });
+
+    // FR (Identity Verification): only show services from providers whose
+    // identity has been verified by an admin. Service approval and identity
+    // verification are separate flows — a service can be approved while its
+    // provider is still unverified, so this filter is applied after populate
+    // rather than in the Service query itself.
+    const visibleServices = services.filter(
+      (s) => s.provider?.providerProfile?.verificationStatus === "verified"
+    );
+
+    return res.status(200).json({ services: visibleServices });
   } catch (err) {
     console.error("listServices error:", err);
     return res.status(500).json({ message: "Server error while searching services." });
