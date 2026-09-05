@@ -1,484 +1,0 @@
-[1mdiff --git a/backend/controllers/bookingController.js b/backend/controllers/bookingController.js[m
-[1mindex 1a333c8..68651f0 100644[m
-[1m--- a/backend/controllers/bookingController.js[m
-[1m+++ b/backend/controllers/bookingController.js[m
-[36m@@ -197,10 +197,12 @@[m [mexports.cancelBooking = async (req, res) => {[m
-     booking.cancelledAt = new Date();[m
-     booking.loyaltyPointsDeducted = pointsPenalty;[m
- [m
-[32m+[m[32m    const wasPaidBeforeCancel = booking.paymentStatus === "Paid";[m[41m[m
-     if (outcome.kind === "auto") {[m
-       // FR-20.1 / FR-20.2 — approve automatically, no admin step.[m
-       booking.refundPercent = outcome.refundPercent;[m
-[31m-      booking.paymentStatus = outcome.refundPercent > 0 ? "Refunded" : booking.paymentStatus;[m
-[32m+[m[32m      booking.paymentStatus =[m[41m[m
-[32m+[m[32m        outcome.refundPercent > 0 && wasPaidBeforeCancel ? "Refunded" : booking.paymentStatus;[m[41m[m
-     } else {[m
-       // FR-20.3 — within 24 hours of the job: don't auto-refund. Leave[m
-       // refundPercent unset (pending) and open a refund request the admin[m
-[36m@@ -220,21 +222,22 @@[m [mexports.cancelBooking = async (req, res) => {[m
- [m
-     if (outcome.kind === "auto") {[m
-       const refundPercent = outcome.refundPercent;[m
-[32m+[m[32m      const refundLine = wasPaidBeforeCancel ? ` (${refundPercent}% refund)` : "";[m[41m[m
-       await notify([m
-         booking.providerId,[m
-[31m-        `${customer?.name || 'Customer'} cancelled the ${booking.service} booking (${refundPercent}% refund).`,[m
-[32m+[m[32m        `${customer?.name || 'Customer'} cancelled the ${booking.service} booking${refundLine}.`,[m[41m[m
-         "booking_cancelled"[m
-       );[m
-       await notify([m
-         req.user.id,[m
-[31m-        // --- LOYALTY FEATURE DISABLED: Simplified notification ---[m
-[31m-        // `You cancelled ${booking.service}. Refund: ${refundPercent}%.${pointsPenalty > 0 ? ` ${pointsPenalty} loyalty points deducted.` : ""}`,[m
-[31m-        `You cancelled ${booking.service}. Refund: ${refundPercent}%.`,[m
-[32m+[m[32m        wasPaidBeforeCancel[m[41m[m
-[32m+[m[32m          ? `You cancelled ${booking.service}. Refund: ${refundPercent}%.`[m[41m[m
-[32m+[m[32m          : `You cancelled ${booking.service}.`,[m[41m[m
-         "booking_cancelled"[m
-       );[m
- [m
-       return res.status(200).json({[m
-[31m-        message: `Booking cancelled. Refund: ${refundPercent}%.`,[m
-[32m+[m[32m        message: wasPaidBeforeCancel ? `Booking cancelled. Refund: ${refundPercent}%.` : "Booking cancelled.",[m[41m[m
-         booking,[m
-         loyaltyPointsDeducted: 0,[m
-       });[m
-[36m@@ -306,12 +309,14 @@[m [mexports.providerCancelBooking = async (req, res) => {[m
-     booking.cancelledBy = "provider";[m
-     booking.cancelledAt = new Date();[m
-     booking.refundPercent = 100;[m
-[31m-    booking.paymentStatus = "Refunded";[m
-[32m+[m[32m    booking.paymentStatus = booking.paymentStatus === "Paid" ? "Refunded" : booking.paymentStatus;[m[41m[m
-     await booking.save();[m
- [m
-     await notify([m
-       booking.customerId,[m
-[31m-      `Your provider cancelled ${booking.service}. You've been refunded 100%.`,[m
-[32m+[m[32m      booking.paymentStatus === "Refunded"[m[41m[m
-[32m+[m[32m        ? `Your provider cancelled ${booking.service}. You've been refunded 100%.`[m[41m[m
-[32m+[m[32m        : `Your provider cancelled ${booking.service}.`,[m[41m[m
-       "booking_cancelled"[m
-     );[m
-     await notify(req.user.id, `You cancelled ${booking.service}.`, "booking_cancelled");[m
-[36m@@ -321,18 +326,28 @@[m [mexports.providerCancelBooking = async (req, res) => {[m
-       User.findById(booking.customerId),[m
-       User.findById(req.user.id),[m
-     ]);[m
-[32m+[m[32m    const wasRefunded = booking.paymentStatus === "Refunded";[m[41m[m
-     await sendEmail([m
-       customer?.email,[m
-[31m-      `Your booking for ${booking.service} was cancelled — 100% refund issued`,[m
-[31m-      `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. You've been refunded 100% of the amount paid.\n\n— FixIt`[m
-[32m+[m[32m      wasRefunded[m[41m[m
-[32m+[m[32m        ? `Your booking for ${booking.service} was cancelled — 100% refund issued`[m[41m[m
-[32m+[m[32m        : `Your booking for ${booking.service} was cancelled`,[m[41m[m
-[32m+[m[32m      wasRefunded[m[41m[m
-[32m+[m[32m        ? `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. You've been refunded 100% of the amount paid.\n\n— FixIt`[m[41m[m
-[32m+[m[32m        : `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. No payment had been made yet, so there's nothing to refund.\n\n— FixIt`[m[41m[m
-     );[m
-     await sendEmail([m
-       provider?.email,[m
-       `You cancelled a booking for ${booking.service}`,[m
-[31m-      `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. The customer has been refunded 100%.\n\n— FixIt`[m
-[32m+[m[32m      wasRefunded[m[41m[m
-[32m+[m[32m        ? `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. The customer has been refunded 100%.\n\n— FixIt`[m[41m[m
-[32m+[m[32m        : `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}.\n\n— FixIt`[m[41m[m
-     );[m
- [m
-[31m-    return res.status(200).json({ message: "Booking cancelled. Customer refunded 100%.", booking });[m
-[32m+[m[32m    return res.status(200).json({[m[41m[m
-[32m+[m[32m      message: wasRefunded ? "Booking cancelled. Customer refunded 100%." : "Booking cancelled.",[m[41m[m
-[32m+[m[32m      booking,[m[41m[m
-[32m+[m[32m    });[m[41m[m
-   } catch (err) {[m
-     console.error("providerCancelBooking error:", err);[m
-     return res.status(500).json({ message: "Server error while cancelling booking." });[m
-[36m@@ -364,13 +379,23 @@[m [mexports.flagNoShow = async (req, res) => {[m
-       booking.cancelledBy = flaggerRole;[m
-       booking.cancelledAt = new Date();[m
-       booking.refundPercent = 100;[m
-[31m-      booking.paymentStatus = "Refunded";[m
-[32m+[m[32m      const wasPaid = booking.paymentStatus === "Paid";[m[41m[m
-[32m+[m[32m      booking.paymentStatus = wasPaid ? "Refunded" : booking.paymentStatus;[m[41m[m
-       await booking.save();[m
- [m
-[31m-      await notify(booking.customerId, `No-show confirmed for ${booking.service}. Refunded 100%.`, "booking_cancelled");[m
-[32m+[m[32m      await notify([m[41m[m
-[32m+[m[32m        booking.customerId,[m[41m[m
-[32m+[m[32m        wasPaid[m[41m[m
-[32m+[m[32m          ? `No-show confirmed for ${booking.service}. Refunded 100%.`[m[41m[m
-[32m+[m[32m          : `No-show confirmed for ${booking.service}.`,[m[41m[m
-[32m+[m[32m        "booking_cancelled"[m[41m[m
-[32m+[m[32m      );[m[41m[m
-       await notify(booking.providerId, `No-show confirmed for ${booking.service}.`, "booking_cancelled");[m
- [m
-[31m-      return res.status(200).json({ message: "No-show confirmed. Booking cancelled with 100% refund.", booking });[m
-[32m+[m[32m      return res.status(200).json({[m[41m[m
-[32m+[m[32m        message: wasPaid ? "No-show confirmed. Booking cancelled with 100% refund." : "No-show confirmed. Booking cancelled.",[m[41m[m
-[32m+[m[32m        booking,[m[41m[m
-[32m+[m[32m      });[m[41m[m
-     }[m
- [m
-     booking.noShowFlaggedBy = flaggerRole;[m
-[36m@@ -380,4 +405,42 @@[m [mexports.flagNoShow = async (req, res) => {[m
-     console.error("flagNoShow error:", err);[m
-     return res.status(500).json({ message: "Server error while flagging no-show." });[m
-   }[m
-[32m+[m[32m};[m[41m[m
-[32m+[m[41m[m
-[32m+[m[32m// A booking becomes payable once the provider accepts it — same window as[m[41m[m
-[32m+[m[32m// online payment (paymentController.js's PAYABLE_STATUSES).[m[41m[m
-[32m+[m[32mconst PAYABLE_STATUSES = ["Confirmed", "En Route", "In Progress", "Completed"];[m[41m[m
-[32m+[m[41m[m
-[32m+[m[32m// @desc  Customer picks how they'll pay: "Online" (SSLCommerz, unchanged) or[m[41m[m
-[32m+[m[32m//        "Cash" (paid to the provider in person; paymentStatus stays[m[41m[m
-[32m+[m[32m//        "Pending" until the provider confirms they received it).[m[41m[m
-[32m+[m[32m// @route PUT /api/bookings/:id/payment-method[m[41m[m
-[32m+[m[32m// @access Private (customer)[m[41m[m
-[32m+[m[32mexports.setPaymentMethod = async (req, res) => {[m[41m[m
-[32m+[m[32m  try {[m[41m[m
-[32m+[m[32m    const { method } = req.body;[m[41m[m
-[32m+[m[32m    if (!["Online", "Cash"].includes(method)) {[m[41m[m
-[32m+[m[32m      return res.status(400).json({ message: "method must be 'Online' or 'Cash'." });[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[32m    const booking = await Booking.findOne({ _id: req.params.id, customerId: req.user.id });[m[41m[m
-[32m+[m[32m    if (!booking) return res.status(404).json({ message: "Booking not found." });[m[41m[m
-[32m+[m[32m    if (booking.paymentStatus === "Paid") {[m[41m[m
-[32m+[m[32m      return res.status(400).json({ message: "This booking is already paid." });[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[32m    if (!PAYABLE_STATUSES.includes(booking.status)) {[m[41m[m
-[32m+[m[32m      return res.status(400).json({[m[41m[m
-[32m+[m[32m        message:[m[41m[m
-[32m+[m[32m          booking.status === "Booked"[m[41m[m
-[32m+[m[32m            ? "Payment opens once the provider accepts this booking."[m[41m[m
-[32m+[m[32m            : "This booking can no longer be paid for.",[m[41m[m
-[32m+[m[32m      });[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[41m[m
-[32m+[m[32m    booking.paymentMethod = method;[m[41m[m
-[32m+[m[32m    await booking.save();[m[41m[m
-[32m+[m[32m    return res.status(200).json({ booking });[m[41m[m
-[32m+[m[32m  } catch (err) {[m[41m[m
-[32m+[m[32m    console.error("setPaymentMethod error:", err);[m[41m[m
-[32m+[m[32m    return res.status(500).json({ message: "Server error while setting payment method." });[m[41m[m
-[32m+[m[32m  }[m[41m[m
- };[m
-\ No newline at end of file[m
-[1mdiff --git a/backend/controllers/paymentController.js b/backend/controllers/paymentController.js[m
-[1mindex cbf194d..3f8168d 100644[m
-[1m--- a/backend/controllers/paymentController.js[m
-[1m+++ b/backend/controllers/paymentController.js[m
-[36m@@ -60,7 +60,7 @@[m [mexports.initiatePayment = async (req, res) => {[m
-       fail_url: `${backendUrl}/api/payment/fail/${tran_id}`,[m
-       cancel_url: `${backendUrl}/api/payment/cancel/${tran_id}`,[m
-       ipn_url: `${backendUrl}/api/payment/ipn`,[m
-[31m-      shipping_method: "N/A",[m
-[32m+[m[32m      shipping_method: "NO",[m
-       product_name: booking.service,[m
-       product_category: "Home Service",[m
-       product_profile: "general",[m
-[36m@@ -71,6 +71,15 @@[m [mexports.initiatePayment = async (req, res) => {[m
-       cus_postcode: "1000",[m
-       cus_country: "Bangladesh",[m
-       cus_phone: customer?.phone || "01700000000",[m
-[32m+[m[32m      // There's no physical shipment for a home service — SSLCommerz still[m
-[32m+[m[32m      // requires these fields to be present, so the "shipping" destination[m
-[32m+[m[32m      // is just the booking address the provider travels to (same as the[m
-[32m+[m[32m      // customer's own address above).[m
-[32m+[m[32m      ship_name: customer?.name || "FixIt Customer",[m
-[32m+[m[32m      ship_add1: booking.address || "Dhaka",[m
-[32m+[m[32m      ship_city: "Dhaka",[m
-[32m+[m[32m      ship_postcode: "1000",[m
-[32m+[m[32m      ship_country: "Bangladesh",[m
-     };[m
- [m
-     const apiResponse = await sslcz.init(data);[m
-[1mdiff --git a/backend/controllers/providerController.js b/backend/controllers/providerController.js[m
-[1mindex 0d3c851..bdf149c 100644[m
-[1m--- a/backend/controllers/providerController.js[m
-[1m+++ b/backend/controllers/providerController.js[m
-[36m@@ -257,6 +257,32 @@[m [mexports.updateBookingStatus = async (req, res) => {[m
-   }[m
- };[m
- [m
-[32m+[m[32m// @desc  Provider confirms they've received cash payment for a booking the[m[41m[m
-[32m+[m[32m//        customer chose to pay in cash. There's no gateway to verify this[m[41m[m
-[32m+[m[32m//        automatically, so it's a direct provider action.[m[41m[m
-[32m+[m[32m// @route PUT /api/provider/bookings/:id/cash-received[m[41m[m
-[32m+[m[32mexports.markCashReceived = async (req, res) => {[m[41m[m
-[32m+[m[32m  try {[m[41m[m
-[32m+[m[32m    const booking = await Booking.findOne({ _id: req.params.id, providerId: req.user.id });[m[41m[m
-[32m+[m[32m    if (!booking) return res.status(404).json({ message: "Booking not found." });[m[41m[m
-[32m+[m[32m    if (booking.paymentMethod !== "Cash") {[m[41m[m
-[32m+[m[32m      return res.status(400).json({ message: "This booking isn't set to pay by cash." });[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[32m    if (booking.paymentStatus === "Paid") {[m[41m[m
-[32m+[m[32m      return res.status(400).json({ message: "This booking is already marked paid." });[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[41m[m
-[32m+[m[32m    booking.paymentStatus = "Paid";[m[41m[m
-[32m+[m[32m    await booking.save();[m[41m[m
-[32m+[m[32m    await notify(booking.customerId, `${booking.provider} confirmed receiving your cash payment for ${booking.service}.`, "general");[m[41m[m
-[32m+[m[41m[m
-[32m+[m[32m    return res.status(200).json({ booking });[m[41m[m
-[32m+[m[32m  } catch (err) {[m[41m[m
-[32m+[m[32m    console.error("markCashReceived error:", err);[m[41m[m
-[32m+[m[32m    return res.status(500).json({ message: "Server error while confirming cash payment." });[m[41m[m
-[32m+[m[32m  }[m[41m[m
-[32m+[m[32m};[m[41m[m
-[32m+[m[41m[m
- // @desc  Earnings summary (today / this week / this month) from completed+paid bookings[m
- // @route GET /api/provider/earnings[m
- exports.getEarnings = async (req, res) => {[m
-[1mdiff --git a/backend/models/Booking.js b/backend/models/Booking.js[m
-[1mindex 1ed1e4c..44527fa 100644[m
-[1m--- a/backend/models/Booking.js[m
-[1m+++ b/backend/models/Booking.js[m
-[36m@@ -22,10 +22,10 @@[m [mconst bookingSchema = new mongoose.Schema([m
-     time: { type: String, required: true },[m
-     address: { type: String, required: true },[m
-     notes: { type: String },[m
-[31m-    amount: { type: Number, required: true },[m
-[31m-    // The service's normal price before any loyalty discount was applied[m
-[31m-    originalAmount: { type: Number },[m
-[31m-    // True if this booking got the 50%-off loyalty reward (100,000+ points)[m
-[32m+[m[32m    amount: { type: Number, required: true },[m[41m[m
-[32m+[m[32m    // The service's normal price before any loyalty discount was applied[m[41m[m
-[32m+[m[32m    originalAmount: { type: Number },[m[41m[m
-[32m+[m[32m    // True if this booking got the 50%-off loyalty reward (100,000+ points)[m[41m[m
-     loyaltyDiscountApplied: { type: Boolean, default: false },[m
-     status: {[m
-       type: String,[m
-[36m@@ -37,6 +37,14 @@[m [mconst bookingSchema = new mongoose.Schema([m
-       enum: ["Pending", "Paid", "Refunded"],[m
-       default: "Pending",[m
-     },[m
-[32m+[m[32m    // How the customer chose to pay — unset until they pick one. "Cash"[m[41m[m
-[32m+[m[32m    // stays "Pending" (paymentStatus) until the provider confirms they've[m[41m[m
-[32m+[m[32m    // actually received it; "Online" goes through SSLCommerz as normal.[m[41m[m
-[32m+[m[32m    paymentMethod: {[m[41m[m
-[32m+[m[32m      type: String,[m[41m[m
-[32m+[m[32m      enum: ["Online", "Cash", null],[m[41m[m
-[32m+[m[32m      default: null,[m[41m[m
-[32m+[m[32m    },[m[41m[m
-     // SSLCommerz transaction id for the most recent payment attempt on this[m
-     // booking (Feature 11). Used to validate the gateway's success/fail/[m
-     // cancel callback and to look the booking back up from it.[m
-[1mdiff --git a/backend/routes/bookingRoutes.js b/backend/routes/bookingRoutes.js[m
-[1mindex 07fce64..ad77f85 100644[m
-[1m--- a/backend/routes/bookingRoutes.js[m
-[1m+++ b/backend/routes/bookingRoutes.js[m
-[36m@@ -7,6 +7,7 @@[m [mconst { auth, role } = require("../middleware/auth");[m
- router.get("/mine", auth, role("customer"), bookingController.getMyBookings);[m
- router.post("/", auth, role("customer"), bookingController.createBooking);[m
- router.put("/:id/cancel", auth, role("customer"), bookingController.cancelBooking);[m
-[32m+[m[32mrouter.put("/:id/payment-method", auth, role("customer"), bookingController.setPaymentMethod);[m
- [m
- // Provider routes (FR-21.2)[m
- router.put("/:id/provider-cancel", auth, role("provider"), bookingController.providerCancelBooking);[m
-[1mdiff --git a/backend/routes/providerRoutes.js b/backend/routes/providerRoutes.js[m
-[1mindex 13db974..4bc7a64 100644[m
-[1m--- a/backend/routes/providerRoutes.js[m
-[1m+++ b/backend/routes/providerRoutes.js[m
-[36m@@ -16,6 +16,7 @@[m [mrouter.get("/bookings/incoming", providerController.getIncomingBookings);[m
- router.get("/bookings/schedule", providerController.getSchedule);[m
- router.put("/bookings/:id/respond", providerController.respondToBooking);[m
- router.put("/bookings/:id/status", providerController.updateBookingStatus);[m
-[32m+[m[32mrouter.put("/bookings/:id/cash-received", providerController.markCashReceived);[m[41m[m
- [m
- router.get("/earnings", providerController.getEarnings);[m
- router.get("/bookings/history", providerController.getServiceHistory);[m
-[1mdiff --git a/frontend/src/components/Dashboard.jsx b/frontend/src/components/Dashboard.jsx[m
-[1mindex ba493fd..f572d44 100644[m
-[1m--- a/frontend/src/components/Dashboard.jsx[m
-[1m+++ b/frontend/src/components/Dashboard.jsx[m
-[36m@@ -40,6 +40,7 @@[m [mexport default function Dashboard({ setActiveTab, reviewCount = 0 }) {[m
-   const [cancelReason, setCancelReason] = useState("");[m
-   const [cancellingId, setCancellingId] = useState(null);[m
-   const [payingId, setPayingId] = useState(null);[m
-[32m+[m[32m  const [choosingMethodId, setChoosingMethodId] = useState(null);[m[41m[m
-   const [partialRefundPercent, setPartialRefundPercent] = useState(null);[m
- [m
-   const showMessage = (title, message) =>[m
-[36m@@ -105,6 +106,22 @@[m [mexport default function Dashboard({ setActiveTab, reviewCount = 0 }) {[m
-     }[m
-   };[m
- [m
-[32m+[m[32m  const choosePaymentMethod = async (booking, method) => {[m[41m[m
-[32m+[m[32m    setChoosingMethodId(booking._id);[m[41m[m
-[32m+[m[32m    try {[m[41m[m
-[32m+[m[32m      const res = await api.put(`/bookings/${booking._id}/payment-method`, { method });[m[41m[m
-[32m+[m[32m      setBookings((prev) => prev.map((b) => (b._id === booking._id ? res.data.booking : b)));[m[41m[m
-[32m+[m[32m      if (method === "Online") {[m[41m[m
-[32m+[m[32m        // Go straight into the SSLCommerz flow instead of making them click again.[m[41m[m
-[32m+[m[32m        handlePay(res.data.booking);[m[41m[m
-[32m+[m[32m      }[m[41m[m
-[32m+[m[32m    } catch (err) {[m[41m[m
-[32m+[m[32m      showMessage("Couldn't set payment method", err.response?.data?.message || "Something went wrong.");[m[41m[m
-[32m+[m[32m    } finally {[m[41m[m
-[32m+[m[32m      setChoosingMethodId(null);[m[41m[m
-[32m+[m[32m    }[m[41m[m
-[32m+[m[32m  };[m[41m[m
-[32m+[m[41m[m
-   const handlePay = async (booking) => {[m
-     setPayingId(booking._id);[m
-     try {[m
-[36m@@ -213,19 +230,40 @@[m [mexport default function Dashboard({ setActiveTab, reviewCount = 0 }) {[m
-                         {featureFlags.payment ? ([m
-                           b.status === "Booked" ? ([m
-                             <span className="text-xs text-slate-400">Opens once accepted</span>[m
-[31m-                          ) : ([m
-[32m+[m[32m                          ) : b.paymentStatus === "Paid" ? ([m[41m[m
-[32m+[m[32m                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">[m[41m[m
-[32m+[m[32m                              Paid{b.paymentMethod === "Cash" ? " (cash)" : ""}[m[41m[m
-[32m+[m[32m                            </span>[m[41m[m
-[32m+[m[32m                          ) : b.paymentMethod === "Cash" ? ([m[41m[m
-[32m+[m[32m                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">[m[41m[m
-[32m+[m[32m                              Pay provider in cash[m[41m[m
-[32m+[m[32m                            </span>[m[41m[m
-[32m+[m[32m                          ) : b.paymentMethod === "Online" ? ([m[41m[m
-                             <button[m
-                               onClick={() => handlePay(b)}[m
-[31m-                              disabled={payingId === b._id || b.paymentStatus === "Paid"}[m
-[32m+[m[32m                              disabled={payingId === b._id}[m[41m[m
-                               className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m
-                             >[m
-                               <CreditCard size={12} />[m
-[31m-                              {b.paymentStatus === "Paid"[m
-[31m-                                ? "Paid"[m
-[31m-                                : payingId === b._id[m
-[31m-                                ? "Redirecting..."[m
-[31m-                                : `Pay ৳${b.amount} now`}[m
-[32m+[m[32m                              {payingId === b._id ? "Redirecting..." : `Pay ৳${b.amount} now`}[m[41m[m
-                             </button>[m
-[32m+[m[32m                          ) : ([m[41m[m
-[32m+[m[32m                            <div className="flex gap-1.5">[m[41m[m
-[32m+[m[32m                              <button[m[41m[m
-[32m+[m[32m                                onClick={() => choosePaymentMethod(b, "Online")}[m[41m[m
-[32m+[m[32m                                disabled={choosingMethodId === b._id}[m[41m[m
-[32m+[m[32m                                className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m[41m[m
-[32m+[m[32m                              >[m[41m[m
-[32m+[m[32m                                Pay online[m[41m[m
-[32m+[m[32m                              </button>[m[41m[m
-[32m+[m[32m                              <button[m[41m[m
-[32m+[m[32m                                onClick={() => choosePaymentMethod(b, "Cash")}[m[41m[m
-[32m+[m[32m                                disabled={choosingMethodId === b._id}[m[41m[m
-[32m+[m[32m                                className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m[41m[m
-[32m+[m[32m                              >[m[41m[m
-[32m+[m[32m                                Pay in cash[m[41m[m
-[32m+[m[32m                              </button>[m[41m[m
-[32m+[m[32m                            </div>[m[41m[m
-                           )[m
-                         ) : ([m
-                           <ComingSoon compact />[m
-[36m@@ -326,14 +364,37 @@[m [mexport default function Dashboard({ setActiveTab, reviewCount = 0 }) {[m
-                         (see src/config/featureFlags.js). */}[m
-                     {featureFlags.payment ? ([m
-                       h.status === "Completed" && h.paymentStatus !== "Paid" ? ([m
-[31m-                        <button[m
-[31m-                          onClick={() => handlePay(h)}[m
-[31m-                          disabled={payingId === h._id}[m
-[31m-                          className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m
-[31m-                        >[m
-[31m-                          <CreditCard size={12} />[m
-[31m-                          {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}[m
-[31m-                        </button>[m
-[32m+[m[32m                        h.paymentMethod === "Cash" ? ([m[41m[m
-[32m+[m[32m                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">[m[41m[m
-[32m+[m[32m                            Awaiting cash confirmation[m[41m[m
-[32m+[m[32m                          </span>[m[41m[m
-[32m+[m[32m                        ) : h.paymentMethod === "Online" ? ([m[41m[m
-[32m+[m[32m                          <button[m[41m[m
-[32m+[m[32m                            onClick={() => handlePay(h)}[m[41m[m
-[32m+[m[32m                            disabled={payingId === h._id}[m[41m[m
-[32m+[m[32m                            className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m[41m[m
-[32m+[m[32m                          >[m[41m[m
-[32m+[m[32m                            <CreditCard size={12} />[m[41m[m
-[32m+[m[32m                            {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}[m[41m[m
-[32m+[m[32m                          </button>[m[41m[m
-[32m+[m[32m                        ) : ([m[41m[m
-[32m+[m[32m                          <div className="flex gap-1.5">[m[41m[m
-[32m+[m[32m                            <button[m[41m[m
-[32m+[m[32m                              onClick={() => choosePaymentMethod(h, "Online")}[m[41m[m
-[32m+[m[32m                              disabled={choosingMethodId === h._id}[m[41m[m
-[32m+[m[32m                              className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m[41m[m
-[32m+[m[32m                            >[m[41m[m
-[32m+[m[32m                              Pay online[m[41m[m
-[32m+[m[32m                            </button>[m[41m[m
-[32m+[m[32m                            <button[m[41m[m
-[32m+[m[32m                              onClick={() => choosePaymentMethod(h, "Cash")}[m[41m[m
-[32m+[m[32m                              disabled={choosingMethodId === h._id}[m[41m[m
-[32m+[m[32m                              className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"[m[41m[m
-[32m+[m[32m                            >[m[41m[m
-[32m+[m[32m                              Pay in cash[m[41m[m
-[32m+[m[32m                            </button>[m[41m[m
-[32m+[m[32m                          </div>[m[41m[m
-[32m+[m[32m                        )[m[41m[m
-                       ) : ([m
-                         <span[m
-                           className={`px-2 py-1 rounded-full text-xs font-semibold ${[m
-[36m@@ -344,7 +405,7 @@[m [mexport default function Dashboard({ setActiveTab, reviewCount = 0 }) {[m
-                               : "bg-slate-100 text-slate-500"[m
-                           }`}[m
-                         >[m
-[31m-                          {h.paymentStatus}[m
-[32m+[m[32m                          {h.paymentStatus}{h.paymentStatus === "Paid" && h.paymentMethod === "Cash" ? " (cash)" : ""}[m[41m[m
-                         </span>[m
-                       )[m
-                     ) : ([m
-[1mdiff --git a/frontend/src/components/ProviderOverview.jsx b/frontend/src/components/ProviderOverview.jsx[m
-[1mindex b7acde4..b326bc6 100644[m
-[1m--- a/frontend/src/components/ProviderOverview.jsx[m
-[1m+++ b/frontend/src/components/ProviderOverview.jsx[m
-[36m@@ -45,6 +45,7 @@[m [mexport default function ProviderOverview() {[m
-   const [showListingForm, setShowListingForm] = useState(false);[m
-   const [listingForm, setListingForm] = useState({ title: "", category: "", price: "", estDurationMins: "", description: "" });[m
-   const [savingListing, setSavingListing] = useState(false);[m
-[32m+[m[32m  const [confirmingCashId, setConfirmingCashId] = useState(null);[m
- [m
-   const availability = user?.providerProfile?.availability || "offline";[m
- [m
-[36m@@ -107,6 +108,18 @@[m [mexport default function ProviderOverview() {[m
-     }[m
-   };[m
- [m
-[32m+[m[32m  const confirmCashReceived = async (bookingId) => {[m
-[32m+[m[32m    setConfirmingCashId(bookingId);[m
-[32m+[m[32m    try {[m
-[32m+[m[32m      await api.put(`/provider/bookings/${bookingId}/cash-received`);[m
-[32m+[m[32m      loadAll();[m
-[32m+[m[32m    } catch (err) {[m
-[32m+[m[32m      alert(err.response?.data?.message || "Could not confirm cash payment.");[m
-[32m+[m[32m    } finally {[m
-[32m+[m[32m      setConfirmingCashId(null);[m
-[32m+[m[32m    }[m
-[32m+[m[32m  };[m
-[32m+[m
-   const handleCreateListing = async (e) => {[m
-     e.preventDefault();[m
-     if (!listingForm.title || !listingForm.category || !listingForm.price) {[m
-[36m@@ -264,7 +277,22 @@[m [mexport default function ProviderOverview() {[m
-                       <td>{b.status}</td>[m
-                       <td>{b.date}</td>[m
-                       <td>{b.status}</td>[m
-[31m-                      <td>{b.paymentStatus}</td>[m
-[32m+[m[32m                      <td>[m
-[32m+[m[32m                        {b.paymentMethod === "Cash" && b.paymentStatus !== "Paid" ? ([m
-[32m+[m[32m                          <button[m
-[32m+[m[32m                            onClick={() => confirmCashReceived(b._id)}[m
-[32m+[m[32m                            disabled={confirmingCashId === b._id}[m
-[32m+[m[32m                            className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1 rounded-lg disabled:opacity-60 whitespace-nowrap"[m
-[32m+[m[32m                          >[m
-[32m+[m[32m                            {confirmingCashId === b._id ? "Confirming..." : "Mark cash received"}[m
-[32m+[m[32m                          </button>[m
-[32m+[m[32m                        ) : ([m
-[32m+[m[32m                          <>[m
-[32m+[m[32m                            {b.paymentStatus}[m
-[32m+[m[32m                            {b.paymentStatus === "Paid" && b.paymentMethod === "Cash" ? " (cash)" : ""}[m
-[32m+[m[32m                          </>[m
-[32m+[m[32m                        )}[m
-[32m+[m[32m                      </td>[m
-                     </tr>[m
-                   ))}[m
-                 </tbody>[m
