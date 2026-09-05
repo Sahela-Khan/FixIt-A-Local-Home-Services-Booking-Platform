@@ -2,6 +2,7 @@ const Service = require("../models/Service");
 const Booking = require("../models/Booking");
 const User = require("../models/User");
 const { notify } = require("./notificationController");
+const { sendEmail } = require("./mailer");
 
 // ---------- SERVICE LISTINGS ----------
 
@@ -141,6 +142,20 @@ exports.getSchedule = async (req, res) => {
   }
 };
 
+// Fires both the in-app notification and a customer email for a booking
+// update — FR-5.4 requires both channels, not just the in-app one.
+const notifyCustomer = async (customerId, inAppMessage, notifyType, emailSubject, emailBody) => {
+  await notify(customerId, inAppMessage, notifyType);
+  try {
+    const customer = await User.findById(customerId).select("email name");
+    if (customer?.email) {
+      await sendEmail(customer.email, emailSubject, emailBody);
+    }
+  } catch (err) {
+    console.error("Failed to email customer about booking update:", err.message);
+  }
+};
+
 // @desc  Accept or reject an incoming booking request
 // @route PUT /api/provider/bookings/:id/respond
 exports.respondToBooking = async (req, res) => {
@@ -154,14 +169,26 @@ exports.respondToBooking = async (req, res) => {
 
     if (action === "accept") {
       booking.status = "Confirmed";
-      await notify(booking.customerId, `${booking.provider} accepted your ${booking.service} booking for ${booking.date} at ${booking.time}.`, "booking_status");
+      await notifyCustomer(
+        booking.customerId,
+        `${booking.provider} accepted your ${booking.service} booking for ${booking.date} at ${booking.time}.`,
+        "booking_status",
+        `Your ${booking.service} booking was accepted`,
+        `Good news! ${booking.provider} accepted your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}.\n\n— FixIt`
+      );
     } else if (action === "reject") {
       booking.status = "Cancelled";
       booking.cancelledBy = "provider";
       booking.cancelledAt = new Date();
       booking.refundPercent = 100;
       booking.paymentStatus = "Refunded";
-      await notify(booking.customerId, `${booking.provider} declined your ${booking.service} booking. Full refund issued.`, "booking_cancelled");
+      await notifyCustomer(
+        booking.customerId,
+        `${booking.provider} declined your ${booking.service} booking. Full refund issued.`,
+        "booking_cancelled",
+        `Your ${booking.service} booking was declined`,
+        `Hi,\n\n${booking.provider} declined your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. You've been refunded 100% of the amount paid.\n\n— FixIt`
+      );
     } else {
       return res.status(400).json({ message: "action must be 'accept' or 'reject'." });
     }
@@ -174,7 +201,8 @@ exports.respondToBooking = async (req, res) => {
   }
 };
 
-// @desc  Move a booking forward through its status steps
+// @desc  Move a booking forward through its status steps, one step at a
+//        time: Confirmed -> En Route -> In Progress -> Completed.
 // @route PUT /api/provider/bookings/:id/status
 exports.updateBookingStatus = async (req, res) => {
   try {
@@ -186,9 +214,32 @@ exports.updateBookingStatus = async (req, res) => {
     const booking = await Booking.findOne({ _id: req.params.id, providerId: req.user.id });
     if (!booking) return res.status(404).json({ message: "Booking not found." });
 
+    // FR-5.1 — enforce the fixed sequence; only the next step from the
+    // booking's current status is a valid move. This also blocks jumping
+    // straight to a later status from "Booked" (not yet accepted) or from
+    // "Cancelled"/"Completed".
+    const nextStep = {
+      Confirmed: "En Route",
+      "En Route": "In Progress",
+      "In Progress": "Completed",
+    };
+    if (nextStep[booking.status] !== status) {
+      return res.status(409).json({
+        message: nextStep[booking.status]
+          ? `This booking is at "${booking.status}" — the next allowed status is "${nextStep[booking.status]}", not "${status}".`
+          : `This booking can't be advanced from its current status ("${booking.status}").`,
+      });
+    }
+
     booking.status = status;
     await booking.save();
-    await notify(booking.customerId, `Your ${booking.service} booking is now: ${status} (scheduled ${booking.date} at ${booking.time}).`, "booking_status");
+    await notifyCustomer(
+      booking.customerId,
+      `Your ${booking.service} booking is now: ${status} (scheduled ${booking.date} at ${booking.time}).`,
+      "booking_status",
+      `Your ${booking.service} booking is now: ${status}`,
+      `Hi,\n\nYour ${booking.service} booking scheduled for ${booking.date} at ${booking.time} is now: ${status}.\n\n— FixIt`
+    );
 
     // FR-10.1 — prompt the customer to leave a rating/review now that the job is done.
     if (status === "Completed") {

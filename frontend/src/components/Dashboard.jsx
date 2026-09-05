@@ -46,13 +46,17 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
     setModal({ open: true, type: "message", title, message });
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const loadBookings = () => {
-    setLoading(true);
-    api
+  const loadBookings = (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    return api
       .get("/bookings/mine")
       .then((res) => setBookings(res.data.bookings))
-      .catch(() => setError("Could not load your bookings."))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (showLoading) setError("Could not load your bookings.");
+      })
+      .finally(() => {
+        if (showLoading) setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -61,6 +65,12 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
       .get("/settings/refund")
       .then((res) => setPartialRefundPercent(res.data.partialRefundPercent))
       .catch(() => {});
+
+    // FR-5.3 — poll for status changes so the active-booking view (and its
+    // step-by-step tracker) stays live without the customer manually
+    // refreshing the page. Silent: no loading spinner, no error banner.
+    const interval = setInterval(() => loadBookings(false), 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const activeBookings = bookings
