@@ -9,6 +9,7 @@ import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Chat from "./pages/Chat";
 import Disputes from "./pages/Disputes";
+import Coupons from "./pages/Coupons";
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -69,6 +70,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={["customer", "provider"]}>
               <Disputes />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/coupons"
+          element={
+            <ProtectedRoute allowedRoles={["customer", "provider"]}>
+              <Coupons />
             </ProtectedRoute>
           }
         />

@@ -10,6 +10,7 @@ const serviceRoutes = require("./routes/serviceRoutes");
 const providerRoutes = require("./routes/providerRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const disputeRoutes = require("./routes/disputeRoutes");
+const couponRoutes = require("./routes/couponRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/provider", providerRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/disputes", disputeRoutes);
+app.use("/api/coupons", couponRoutes);
 app.use("/api/categories", categoryRoutes);
 
 app.use((req, res) => {
