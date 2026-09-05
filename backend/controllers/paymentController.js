@@ -60,7 +60,7 @@ exports.initiatePayment = async (req, res) => {
       fail_url: `${backendUrl}/api/payment/fail/${tran_id}`,
       cancel_url: `${backendUrl}/api/payment/cancel/${tran_id}`,
       ipn_url: `${backendUrl}/api/payment/ipn`,
-      shipping_method: "N/A",
+      shipping_method: "NO",
       product_name: booking.service,
       product_category: "Home Service",
       product_profile: "general",
@@ -71,6 +71,15 @@ exports.initiatePayment = async (req, res) => {
       cus_postcode: "1000",
       cus_country: "Bangladesh",
       cus_phone: customer?.phone || "01700000000",
+      // There's no physical shipment for a home service — SSLCommerz still
+      // requires these fields to be present, so the "shipping" destination
+      // is just the booking address the provider travels to (same as the
+      // customer's own address above).
+      ship_name: customer?.name || "FixIt Customer",
+      ship_add1: booking.address || "Dhaka",
+      ship_city: "Dhaka",
+      ship_postcode: "1000",
+      ship_country: "Bangladesh",
     };
 
     const apiResponse = await sslcz.init(data);

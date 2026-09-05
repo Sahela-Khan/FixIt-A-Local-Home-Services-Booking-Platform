@@ -16,6 +16,7 @@ router.get("/bookings/incoming", providerController.getIncomingBookings);
 router.get("/bookings/schedule", providerController.getSchedule);
 router.put("/bookings/:id/respond", providerController.respondToBooking);
 router.put("/bookings/:id/status", providerController.updateBookingStatus);
+router.put("/bookings/:id/cash-received", providerController.markCashReceived);
 
 router.get("/earnings", providerController.getEarnings);
 router.get("/bookings/history", providerController.getServiceHistory);

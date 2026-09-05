@@ -197,10 +197,12 @@ exports.cancelBooking = async (req, res) => {
     booking.cancelledAt = new Date();
     booking.loyaltyPointsDeducted = pointsPenalty;
 
+    const wasPaidBeforeCancel = booking.paymentStatus === "Paid";
     if (outcome.kind === "auto") {
       // FR-20.1 / FR-20.2 — approve automatically, no admin step.
       booking.refundPercent = outcome.refundPercent;
-      booking.paymentStatus = outcome.refundPercent > 0 ? "Refunded" : booking.paymentStatus;
+      booking.paymentStatus =
+        outcome.refundPercent > 0 && wasPaidBeforeCancel ? "Refunded" : booking.paymentStatus;
     } else {
       // FR-20.3 — within 24 hours of the job: don't auto-refund. Leave
       // refundPercent unset (pending) and open a refund request the admin
@@ -220,21 +222,22 @@ exports.cancelBooking = async (req, res) => {
 
     if (outcome.kind === "auto") {
       const refundPercent = outcome.refundPercent;
+      const refundLine = wasPaidBeforeCancel ? ` (${refundPercent}% refund)` : "";
       await notify(
         booking.providerId,
-        `${customer?.name || 'Customer'} cancelled the ${booking.service} booking (${refundPercent}% refund).`,
+        `${customer?.name || 'Customer'} cancelled the ${booking.service} booking${refundLine}.`,
         "booking_cancelled"
       );
       await notify(
         req.user.id,
-        // --- LOYALTY FEATURE DISABLED: Simplified notification ---
-        // `You cancelled ${booking.service}. Refund: ${refundPercent}%.${pointsPenalty > 0 ? ` ${pointsPenalty} loyalty points deducted.` : ""}`,
-        `You cancelled ${booking.service}. Refund: ${refundPercent}%.`,
+        wasPaidBeforeCancel
+          ? `You cancelled ${booking.service}. Refund: ${refundPercent}%.`
+          : `You cancelled ${booking.service}.`,
         "booking_cancelled"
       );
 
       return res.status(200).json({
-        message: `Booking cancelled. Refund: ${refundPercent}%.`,
+        message: wasPaidBeforeCancel ? `Booking cancelled. Refund: ${refundPercent}%.` : "Booking cancelled.",
         booking,
         loyaltyPointsDeducted: 0,
       });
@@ -306,12 +309,14 @@ exports.providerCancelBooking = async (req, res) => {
     booking.cancelledBy = "provider";
     booking.cancelledAt = new Date();
     booking.refundPercent = 100;
-    booking.paymentStatus = "Refunded";
+    booking.paymentStatus = booking.paymentStatus === "Paid" ? "Refunded" : booking.paymentStatus;
     await booking.save();
 
     await notify(
       booking.customerId,
-      `Your provider cancelled ${booking.service}. You've been refunded 100%.`,
+      booking.paymentStatus === "Refunded"
+        ? `Your provider cancelled ${booking.service}. You've been refunded 100%.`
+        : `Your provider cancelled ${booking.service}.`,
       "booking_cancelled"
     );
     await notify(req.user.id, `You cancelled ${booking.service}.`, "booking_cancelled");
@@ -321,18 +326,28 @@ exports.providerCancelBooking = async (req, res) => {
       User.findById(booking.customerId),
       User.findById(req.user.id),
     ]);
+    const wasRefunded = booking.paymentStatus === "Refunded";
     await sendEmail(
       customer?.email,
-      `Your booking for ${booking.service} was cancelled — 100% refund issued`,
-      `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. You've been refunded 100% of the amount paid.\n\n— FixIt`
+      wasRefunded
+        ? `Your booking for ${booking.service} was cancelled — 100% refund issued`
+        : `Your booking for ${booking.service} was cancelled`,
+      wasRefunded
+        ? `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. You've been refunded 100% of the amount paid.\n\n— FixIt`
+        : `Hi ${customer?.name || "there"},\n\nYour provider cancelled your ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. No payment had been made yet, so there's nothing to refund.\n\n— FixIt`
     );
     await sendEmail(
       provider?.email,
       `You cancelled a booking for ${booking.service}`,
-      `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. The customer has been refunded 100%.\n\n— FixIt`
+      wasRefunded
+        ? `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}. The customer has been refunded 100%.\n\n— FixIt`
+        : `Hi ${provider?.name || "there"},\n\nThis confirms you cancelled the ${booking.service} booking scheduled for ${booking.date} at ${booking.time}.\n\n— FixIt`
     );
 
-    return res.status(200).json({ message: "Booking cancelled. Customer refunded 100%.", booking });
+    return res.status(200).json({
+      message: wasRefunded ? "Booking cancelled. Customer refunded 100%." : "Booking cancelled.",
+      booking,
+    });
   } catch (err) {
     console.error("providerCancelBooking error:", err);
     return res.status(500).json({ message: "Server error while cancelling booking." });
@@ -364,13 +379,23 @@ exports.flagNoShow = async (req, res) => {
       booking.cancelledBy = flaggerRole;
       booking.cancelledAt = new Date();
       booking.refundPercent = 100;
-      booking.paymentStatus = "Refunded";
+      const wasPaid = booking.paymentStatus === "Paid";
+      booking.paymentStatus = wasPaid ? "Refunded" : booking.paymentStatus;
       await booking.save();
 
-      await notify(booking.customerId, `No-show confirmed for ${booking.service}. Refunded 100%.`, "booking_cancelled");
+      await notify(
+        booking.customerId,
+        wasPaid
+          ? `No-show confirmed for ${booking.service}. Refunded 100%.`
+          : `No-show confirmed for ${booking.service}.`,
+        "booking_cancelled"
+      );
       await notify(booking.providerId, `No-show confirmed for ${booking.service}.`, "booking_cancelled");
 
-      return res.status(200).json({ message: "No-show confirmed. Booking cancelled with 100% refund.", booking });
+      return res.status(200).json({
+        message: wasPaid ? "No-show confirmed. Booking cancelled with 100% refund." : "No-show confirmed. Booking cancelled.",
+        booking,
+      });
     }
 
     booking.noShowFlaggedBy = flaggerRole;
@@ -379,5 +404,43 @@ exports.flagNoShow = async (req, res) => {
   } catch (err) {
     console.error("flagNoShow error:", err);
     return res.status(500).json({ message: "Server error while flagging no-show." });
+  }
+};
+
+// A booking becomes payable once the provider accepts it — same window as
+// online payment (paymentController.js's PAYABLE_STATUSES).
+const PAYABLE_STATUSES = ["Confirmed", "En Route", "In Progress", "Completed"];
+
+// @desc  Customer picks how they'll pay: "Online" (SSLCommerz, unchanged) or
+//        "Cash" (paid to the provider in person; paymentStatus stays
+//        "Pending" until the provider confirms they received it).
+// @route PUT /api/bookings/:id/payment-method
+// @access Private (customer)
+exports.setPaymentMethod = async (req, res) => {
+  try {
+    const { method } = req.body;
+    if (!["Online", "Cash"].includes(method)) {
+      return res.status(400).json({ message: "method must be 'Online' or 'Cash'." });
+    }
+    const booking = await Booking.findOne({ _id: req.params.id, customerId: req.user.id });
+    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    if (booking.paymentStatus === "Paid") {
+      return res.status(400).json({ message: "This booking is already paid." });
+    }
+    if (!PAYABLE_STATUSES.includes(booking.status)) {
+      return res.status(400).json({
+        message:
+          booking.status === "Booked"
+            ? "Payment opens once the provider accepts this booking."
+            : "This booking can no longer be paid for.",
+      });
+    }
+
+    booking.paymentMethod = method;
+    await booking.save();
+    return res.status(200).json({ booking });
+  } catch (err) {
+    console.error("setPaymentMethod error:", err);
+    return res.status(500).json({ message: "Server error while setting payment method." });
   }
 };

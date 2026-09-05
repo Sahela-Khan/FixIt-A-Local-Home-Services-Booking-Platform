@@ -257,6 +257,32 @@ exports.updateBookingStatus = async (req, res) => {
   }
 };
 
+// @desc  Provider confirms they've received cash payment for a booking the
+//        customer chose to pay in cash. There's no gateway to verify this
+//        automatically, so it's a direct provider action.
+// @route PUT /api/provider/bookings/:id/cash-received
+exports.markCashReceived = async (req, res) => {
+  try {
+    const booking = await Booking.findOne({ _id: req.params.id, providerId: req.user.id });
+    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    if (booking.paymentMethod !== "Cash") {
+      return res.status(400).json({ message: "This booking isn't set to pay by cash." });
+    }
+    if (booking.paymentStatus === "Paid") {
+      return res.status(400).json({ message: "This booking is already marked paid." });
+    }
+
+    booking.paymentStatus = "Paid";
+    await booking.save();
+    await notify(booking.customerId, `${booking.provider} confirmed receiving your cash payment for ${booking.service}.`, "general");
+
+    return res.status(200).json({ booking });
+  } catch (err) {
+    console.error("markCashReceived error:", err);
+    return res.status(500).json({ message: "Server error while confirming cash payment." });
+  }
+};
+
 // @desc  Earnings summary (today / this week / this month) from completed+paid bookings
 // @route GET /api/provider/earnings
 exports.getEarnings = async (req, res) => {

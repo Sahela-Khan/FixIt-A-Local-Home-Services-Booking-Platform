@@ -40,6 +40,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
   const [cancelReason, setCancelReason] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
+  const [choosingMethodId, setChoosingMethodId] = useState(null);
   const [partialRefundPercent, setPartialRefundPercent] = useState(null);
 
   const showMessage = (title, message) =>
@@ -102,6 +103,22 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
       showMessage("Could not cancel", err.response?.data?.message || "Something went wrong.");
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const choosePaymentMethod = async (booking, method) => {
+    setChoosingMethodId(booking._id);
+    try {
+      const res = await api.put(`/bookings/${booking._id}/payment-method`, { method });
+      setBookings((prev) => prev.map((b) => (b._id === booking._id ? res.data.booking : b)));
+      if (method === "Online") {
+        // Go straight into the SSLCommerz flow instead of making them click again.
+        handlePay(res.data.booking);
+      }
+    } catch (err) {
+      showMessage("Couldn't set payment method", err.response?.data?.message || "Something went wrong.");
+    } finally {
+      setChoosingMethodId(null);
     }
   };
 
@@ -213,19 +230,40 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                         {featureFlags.payment ? (
                           b.status === "Booked" ? (
                             <span className="text-xs text-slate-400">Opens once accepted</span>
-                          ) : (
+                          ) : b.paymentStatus === "Paid" ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                              Paid{b.paymentMethod === "Cash" ? " (cash)" : ""}
+                            </span>
+                          ) : b.paymentMethod === "Cash" ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                              Pay provider in cash
+                            </span>
+                          ) : b.paymentMethod === "Online" ? (
                             <button
                               onClick={() => handlePay(b)}
-                              disabled={payingId === b._id || b.paymentStatus === "Paid"}
+                              disabled={payingId === b._id}
                               className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
                             >
                               <CreditCard size={12} />
-                              {b.paymentStatus === "Paid"
-                                ? "Paid"
-                                : payingId === b._id
-                                ? "Redirecting..."
-                                : `Pay ৳${b.amount} now`}
+                              {payingId === b._id ? "Redirecting..." : `Pay ৳${b.amount} now`}
                             </button>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => choosePaymentMethod(b, "Online")}
+                                disabled={choosingMethodId === b._id}
+                                className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                              >
+                                Pay online
+                              </button>
+                              <button
+                                onClick={() => choosePaymentMethod(b, "Cash")}
+                                disabled={choosingMethodId === b._id}
+                                className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                              >
+                                Pay in cash
+                              </button>
+                            </div>
                           )
                         ) : (
                           <ComingSoon compact />
@@ -326,14 +364,37 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                         (see src/config/featureFlags.js). */}
                     {featureFlags.payment ? (
                       h.status === "Completed" && h.paymentStatus !== "Paid" ? (
-                        <button
-                          onClick={() => handlePay(h)}
-                          disabled={payingId === h._id}
-                          className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-                        >
-                          <CreditCard size={12} />
-                          {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}
-                        </button>
+                        h.paymentMethod === "Cash" ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">
+                            Awaiting cash confirmation
+                          </span>
+                        ) : h.paymentMethod === "Online" ? (
+                          <button
+                            onClick={() => handlePay(h)}
+                            disabled={payingId === h._id}
+                            className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                          >
+                            <CreditCard size={12} />
+                            {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}
+                          </button>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => choosePaymentMethod(h, "Online")}
+                              disabled={choosingMethodId === h._id}
+                              className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              Pay online
+                            </button>
+                            <button
+                              onClick={() => choosePaymentMethod(h, "Cash")}
+                              disabled={choosingMethodId === h._id}
+                              className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              Pay in cash
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -344,7 +405,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                               : "bg-slate-100 text-slate-500"
                           }`}
                         >
-                          {h.paymentStatus}
+                          {h.paymentStatus}{h.paymentStatus === "Paid" && h.paymentMethod === "Cash" ? " (cash)" : ""}
                         </span>
                       )
                     ) : (

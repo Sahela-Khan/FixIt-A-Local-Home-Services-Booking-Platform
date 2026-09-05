@@ -37,6 +37,14 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Pending", "Paid", "Refunded"],
       default: "Pending",
     },
+    // How the customer chose to pay — unset until they pick one. "Cash"
+    // stays "Pending" (paymentStatus) until the provider confirms they've
+    // actually received it; "Online" goes through SSLCommerz as normal.
+    paymentMethod: {
+      type: String,
+      enum: ["Online", "Cash", null],
+      default: null,
+    },
     // SSLCommerz transaction id for the most recent payment attempt on this
     // booking (Feature 11). Used to validate the gateway's success/fail/
     // cancel callback and to look the booking back up from it.
