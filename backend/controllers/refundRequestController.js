@@ -109,8 +109,9 @@ exports.resolveRefundRequest = async (req, res) => {
     await refundRequest.save();
 
     const booking = await Booking.findById(refundRequest.bookingId);
+    const wasPaid = booking?.paymentStatus === "Paid";
     if (booking && decision === "Approved") {
-      booking.paymentStatus = "Refunded";
+      booking.paymentStatus = wasPaid ? "Refunded" : booking.paymentStatus;
       booking.refundPercent = refundPercent;
       await booking.save();
     }
@@ -119,7 +120,9 @@ exports.resolveRefundRequest = async (req, res) => {
       await notify(
         refundRequest.customerId,
         decision === "Approved"
-          ? `Your refund request for ${booking.service} was approved (${refundPercent}%).`
+          ? wasPaid
+            ? `Your refund request for ${booking.service} was approved (${refundPercent}%).`
+            : `Your refund request for ${booking.service} was approved, but no payment had been made yet, so there's nothing to refund.`
           : `Your refund request for ${booking.service} was rejected.${note ? ` Reason: ${note}` : ""}`,
         "general"
       );
