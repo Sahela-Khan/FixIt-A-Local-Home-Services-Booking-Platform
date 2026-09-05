@@ -1,33 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const Booking = require("../models/Booking");
+const bookingController = require("../controllers/bookingController");
+const { auth, role } = require("../middleware/auth");
 
-router.get("/", async (req, res) => {
-  try {
-    const bookings = await Booking.find().sort({ createdAt: -1 });
-    res.json(bookings);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+// Customer routes
+router.get("/mine", auth, role("customer"), bookingController.getMyBookings);
+router.post("/", auth, role("customer"), bookingController.createBooking);
+router.put("/:id/cancel", auth, role("customer"), bookingController.cancelBooking);
+router.put("/:id/pay", auth, role("customer"), bookingController.payNow);
 
-router.post("/", async (req, res) => {
-  try {
-    const newBooking = new Booking(req.body);
-    const saved = await newBooking.save();
-    res.status(201).json(saved);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+// Provider routes (FR-21.2)
+router.put("/:id/provider-cancel", auth, role("provider"), bookingController.providerCancelBooking);
 
-router.put("/:id", async (req, res) => {
-  try {
-    const updated = await Booking.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+// Shared — either party on the booking (FR-21.3)
+router.put("/:id/flag-no-show", auth, bookingController.flagNoShow);
 
 module.exports = router;

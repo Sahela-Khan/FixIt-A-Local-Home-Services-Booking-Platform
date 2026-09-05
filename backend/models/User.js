@@ -22,6 +22,11 @@ const userSchema = new mongoose.Schema(
       required: [true, "Phone number is required"],
       trim: true,
     },
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     passwordHash: {
       type: String,
       required: [true, "Password is required"],
@@ -37,14 +42,28 @@ const userSchema = new mongoose.Schema(
       skills: [String],
       experienceYears: Number,
       serviceArea: String,
+      bio: String,
       photoUrl: String,
       availability: {
         type: String,
         enum: ["online", "offline", "busy"],
         default: "offline",
       },
+      verificationStatus: {
+        type: String,
+        enum: ["unverified", "pending", "verified", "rejected"],
+        default: "unverified",
+      },
+      nidNumber: { type: String, trim: true, default: "" },
+      nidPhotoUrl: { type: String, default: "" },
+      verificationNote: { type: String, default: "" },
+      avgRating: { type: Number, default: 0 },
+      reviewCount: { type: Number, default: 0 },
     },
     loyaltyPoints: { type: Number, default: 0 },
+    savedProviders: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    ],
   },
   { timestamps: true }
 );

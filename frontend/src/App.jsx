@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth, roleHome } from "./context/AuthContext";
-import Navbar from "./components/Navbar";
+//import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -16,7 +16,7 @@ export default function App() {
 
   return (
     <>
-      {!hasOwnSidebar && <Navbar />}
+      {/* {!hasOwnSidebar && <Navbar />} */}
       <Routes>
         <Route
           path="/"

@@ -15,7 +15,7 @@ const serviceSchema = new mongoose.Schema(
     approvalStatus: {
       type: String,
       enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      default: "approved", // TODO: switch back to "pending" once admin approval flow (Feature 9) is working
     },
     isActive: { type: Boolean, default: true },
   },

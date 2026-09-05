@@ -107,3 +107,47 @@ exports.getMe = async (req, res) => {
     return res.status(500).json({ message: "Server error." });
   }
 };
+
+
+exports.updateMe = async (req, res) => {
+  try {
+    const { phone, address, email } = req.body;
+    const update = {};
+
+    if (phone !== undefined) {
+      if (!phone.trim()) {
+        return res.status(400).json({ message: "Phone number cannot be empty." });
+      }
+      update.phone = phone.trim();
+    }
+    if (address !== undefined) {
+      update.address = address.trim();
+    }
+    if (email !== undefined) {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+        return res.status(400).json({ message: "Please provide a valid email." });
+      }
+      const existing = await User.findOne({ email: trimmedEmail, _id: { $ne: req.user.id } });
+      if (existing) {
+        return res.status(409).json({ message: "This email is already in use." });
+      }
+      update.email = trimmedEmail;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, {
+      new: true,
+      runValidators: true,
+    });
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.status(200).json({ message: "Profile updated.", user });
+  } catch (err) {
+    if (err.name === "ValidationError") {
+      const firstError = Object.values(err.errors)[0].message;
+      return res.status(400).json({ message: firstError });
+    }
+    console.error("updateMe error:", err);
+    return res.status(500).json({ message: "Server error while updating profile." });
+  }
+};
