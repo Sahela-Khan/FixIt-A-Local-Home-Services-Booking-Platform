@@ -15,14 +15,16 @@ const sendAuthResponse = (res, statusCode, user) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      address: user.address,
       role: user.role,
+      loyaltyPoints: user.loyaltyPoints,
     },
   });
 };
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, address, password, role } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res
@@ -49,6 +51,7 @@ exports.register = async (req, res) => {
       name,
       email,
       phone,
+      address: address || "",
       passwordHash: password,
       role: safeRole,
     });
@@ -108,7 +111,9 @@ exports.getMe = async (req, res) => {
   }
 };
 
-
+// @desc  Update the logged-in user's own contact details
+// @route PUT /api/auth/me
+// @access Private (any logged-in user)
 exports.updateMe = async (req, res) => {
   try {
     const { phone, address, email } = req.body;
