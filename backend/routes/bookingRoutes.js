@@ -7,7 +7,7 @@ const { auth, role } = require("../middleware/auth");
 router.get("/mine", auth, role("customer"), bookingController.getMyBookings);
 router.post("/", auth, role("customer"), bookingController.createBooking);
 router.put("/:id/cancel", auth, role("customer"), bookingController.cancelBooking);
-router.put("/:id/pay", auth, role("customer"), bookingController.payNow);
+router.put("/:id/payment-method", auth, role("customer"), bookingController.setPaymentMethod);
 
 // Provider routes (FR-21.2)
 router.put("/:id/provider-cancel", auth, role("provider"), bookingController.providerCancelBooking);

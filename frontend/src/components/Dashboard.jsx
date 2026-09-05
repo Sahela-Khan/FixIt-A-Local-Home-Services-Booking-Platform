@@ -3,6 +3,8 @@ import { CheckCircle2, XCircle, Star, ClipboardList, MapPin, Calendar, Download,
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import AppModal from "./AppModal";
+import ComingSoon from "./ComingSoon";
+import featureFlags from "../config/featureFlags";
 
 const steps = ["Booked", "Confirmed", "En Route", "In Progress", "Completed"];
 
@@ -15,12 +17,13 @@ function sortByDateAsc(a, b) {
   return new Date(`${a.date} ${a.time}`) - new Date(`${b.date} ${b.time}`);
 }
 
-function refundHintFor(booking) {
+function refundHintFor(booking, partialRefundPercent) {
   if (booking.status === "Booked") return "Before provider accepts — cancelling now gives a 100% refund";
   const jobDateTime = new Date(`${booking.date} ${booking.time}`);
   const hoursRemaining = (jobDateTime - new Date()) / (1000 * 60 * 60);
-  if (hoursRemaining >= 24) return "Accepted, 24+ hours away — cancelling now gives a 50% refund";
-  return "Within 24 hours of the job — cancelling now gives no refund";
+  if (hoursRemaining >= 24)
+    return `Accepted, 24+ hours away — cancelling now gives a ${partialRefundPercent ?? 50}% refund`;
+  return "Within 24 hours of the job — cancelling now flags the refund for admin review instead of an automatic refund";
 }
 
 export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
@@ -29,31 +32,46 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [expandedId, setExpandedId] = useState(null);
-  const [historyOpen, setHistoryOpen] = useState(true);
-  const [upcomingOpen, setUpcomingOpen] = useState(true);
+  const [expandedId, setExpandedId] = useState(null); // which row's service name was clicked (shows details)
 
+  // Modal state — replaces window.alert / window.prompt / window.confirm
   const [modal, setModal] = useState({ open: false, type: "message", title: "", message: "" });
-  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null); // booking currently being confirmed for cancel
   const [cancelReason, setCancelReason] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
+  const [choosingMethodId, setChoosingMethodId] = useState(null);
+  const [partialRefundPercent, setPartialRefundPercent] = useState(null);
 
   const showMessage = (title, message) =>
     setModal({ open: true, type: "message", title, message });
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const loadBookings = () => {
-    setLoading(true);
-    api
+  const loadBookings = (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    return api
       .get("/bookings/mine")
       .then((res) => setBookings(res.data.bookings))
-      .catch(() => setError("Could not load your bookings."))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (showLoading) setError("Could not load your bookings.");
+      })
+      .finally(() => {
+        if (showLoading) setLoading(false);
+      });
   };
 
   useEffect(() => {
     loadBookings();
+    api
+      .get("/settings/refund")
+      .then((res) => setPartialRefundPercent(res.data.partialRefundPercent))
+      .catch(() => {});
+
+    // FR-5.3 — poll for status changes so the active-booking view (and its
+    // step-by-step tracker) stays live without the customer manually
+    // refreshing the page. Silent: no loading spinner, no error banner.
+    const interval = setInterval(() => loadBookings(false), 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const activeBookings = bookings
@@ -75,10 +93,15 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
     setCancellingId(cancelTarget._id);
     try {
       const res = await api.put(`/bookings/${cancelTarget._id}/cancel`, { reason: cancelReason });
-      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
       setCancelTarget(null);
       setExpandedId(null);
       loadBookings();
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
+      if (res.data?.message) {
+        showMessage("Booking cancelled", res.data.message);
+      }
     } catch (err) {
       showMessage("Could not cancel", err.response?.data?.message || "Something went wrong.");
     } finally {
@@ -86,18 +109,36 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
     }
   };
 
-  const handlePay = async (booking) => {
-    if (booking.status !== "Completed") {
-      showMessage("Booking not completed", "You can only pay once the job has been marked Completed by the provider.");
-      return;
+  const choosePaymentMethod = async (booking, method) => {
+    setChoosingMethodId(booking._id);
+    try {
+      const res = await api.put(`/bookings/${booking._id}/payment-method`, { method });
+      setBookings((prev) => prev.map((b) => (b._id === booking._id ? res.data.booking : b)));
+      if (method === "Online") {
+        // Go straight into the SSLCommerz flow instead of making them click again.
+        handlePay(res.data.booking);
+      }
+    } catch (err) {
+      showMessage("Couldn't set payment method", err.response?.data?.message || "Something went wrong.");
+    } finally {
+      setChoosingMethodId(null);
     }
+  };
+
+  const handlePay = async (booking) => {
     setPayingId(booking._id);
     try {
-      await api.put(`/bookings/${booking._id}/pay`);
-      loadBookings();
+      const res = await api.post(`/payment/init/${booking._id}`);
+      if (res.data?.GatewayPageURL) {
+        // Send the browser to SSLCommerz's hosted payment page. The gateway
+        // will redirect back to /payment/result once the customer finishes.
+        window.location.href = res.data.GatewayPageURL;
+      } else {
+        showMessage("Payment failed", "Could not start the payment session. Please try again.");
+        setPayingId(null);
+      }
     } catch (err) {
       showMessage("Payment failed", err.response?.data?.message || "Something went wrong.");
-    } finally {
       setPayingId(null);
     }
   };
@@ -135,30 +176,18 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         ))}
       </div>
 
-      {/* Upcoming Booking table — shows Amount instead of a Pay action,
-          since paying is only possible once a booking is Completed
-          (those live in the History table below). */}
+      {/* Merged Current + Upcoming table */}
       <div className="bg-white rounded-xl p-5 shadow-sm mb-6">
-        <button
-          onClick={() => setUpcomingOpen((prev) => !prev)}
-          className="w-full flex items-center justify-between mb-3"
-        >
-          <h3 className="font-semibold">Upcoming Booking</h3>
-          {upcomingOpen ? (
-            <ChevronUp size={18} className="text-slate-400" />
-          ) : (
-            <ChevronDown size={18} className="text-slate-400" />
-          )}
-        </button>
+        <h3 className="font-semibold mb-3">Upcoming Booking</h3>
 
-        {upcomingOpen && loading && <p className="text-sm text-slate-400">Loading...</p>}
-        {upcomingOpen && !loading && activeBookings.length === 0 && (
+        {loading && <p className="text-sm text-slate-400">Loading...</p>}
+        {!loading && activeBookings.length === 0 && (
           <p className="text-sm text-slate-400">
             No bookings yet. Go to "Search & Book" to create one!
           </p>
         )}
 
-        {upcomingOpen && activeBookings.length > 0 && (
+        {activeBookings.length > 0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b">
@@ -166,13 +195,13 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                 <th>Provider</th>
                 <th>Date</th>
                 <th>Booking Progress</th>
-                <th>Amount</th>
+                <th>Pay</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {activeBookings.map((b, index) => {
-                const isCurrent = index === 0;
+                const isCurrent = index === 0; // earliest booking = "current"
                 const isExpanded = expandedId === b._id;
                 return (
                   <Fragment key={b._id}>
@@ -198,7 +227,51 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                           {b.status}
                         </span>
                       </td>
-                      <td className="py-3 pr-2 font-semibold">৳ {b.amount}</td>
+                      <td className="py-3 pr-2">
+                        {/* Feature 11 — Payment Integration. Held back for Sprint 3
+                            (see src/config/featureFlags.js). */}
+                        {featureFlags.payment ? (
+                          b.status === "Booked" ? (
+                            <span className="text-xs text-slate-400">Opens once accepted</span>
+                          ) : b.paymentStatus === "Paid" ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                              Paid{b.paymentMethod === "Cash" ? " (cash)" : ""}
+                            </span>
+                          ) : b.paymentMethod === "Cash" ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                              Pay provider in cash
+                            </span>
+                          ) : b.paymentMethod === "Online" ? (
+                            <button
+                              onClick={() => handlePay(b)}
+                              disabled={payingId === b._id}
+                              className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              <CreditCard size={12} />
+                              {payingId === b._id ? "Redirecting..." : `Pay ৳${b.amount} now`}
+                            </button>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => choosePaymentMethod(b, "Online")}
+                                disabled={choosingMethodId === b._id}
+                                className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                              >
+                                Pay online
+                              </button>
+                              <button
+                                onClick={() => choosePaymentMethod(b, "Cash")}
+                                disabled={choosingMethodId === b._id}
+                                className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                              >
+                                Pay in cash
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          <ComingSoon compact />
+                        )}
+                      </td>
                       <td className="py-3 text-right">
                         <button
                           onClick={() => openCancelConfirm(b)}
@@ -213,21 +286,33 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                       <tr>
                         <td colSpan={6} className="bg-slate-50 px-3 py-4 rounded-lg">
                           <p className="text-sm text-slate-500 mb-2">📍 {b.address}</p>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {steps.map((step, i) => (
-                              <span
-                                key={step}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  i <= getStepIndex(b.status)
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-slate-200 text-slate-400"
-                                }`}
-                              >
-                                {step}
-                              </span>
-                            ))}
-                          </div>
-                          <p className="text-xs text-slate-500">{refundHintFor(b)}</p>
+                          {/* Feature 5 — Real-Time Job Status Tracker. Held back for
+                              Sprint 3 (see src/config/featureFlags.js). The status
+                              badge in the table column above still reflects the
+                              booking's real status; only this step-by-step visual
+                              is hidden. */}
+                          {featureFlags.statusTracker ? (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {steps.map((step, i) => (
+                                <span
+                                  key={step}
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    i <= getStepIndex(b.status)
+                                      ? "bg-orange-500 text-white"
+                                      : "bg-slate-200 text-slate-400"
+                                  }`}
+                                >
+                                  {step}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mb-2">
+                              <ComingSoon compact />
+                              <span className="ml-2 text-xs text-slate-400">Live step-by-step tracking</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500">{refundHintFor(b, partialRefundPercent)}</p>
                         </td>
                       </tr>
                     )}
@@ -239,38 +324,23 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         )}
       </div>
 
-      {/* Booking History table — collapsible via the chevron next to the
-          heading. Shows Pay instead of plain Amount: Completed bookings get
-          the Pay button/Paid badge, Cancelled bookings show
-          Refunded / Not Refunded based on paymentStatus. */}
       <div className="bg-white rounded-xl p-5 shadow-sm">
-        <button
-          onClick={() => setHistoryOpen((prev) => !prev)}
-          className="w-full flex items-center justify-between mb-3"
-        >
-          <h3 className="font-semibold">📄 My Booking History</h3>
-          {historyOpen ? (
-            <ChevronUp size={18} className="text-slate-400" />
-          ) : (
-            <ChevronDown size={18} className="text-slate-400" />
-          )}
-        </button>
-
-        {historyOpen && !loading && historyBookings.length === 0 && (
+        <h3 className="font-semibold mb-3">📄 My Booking History</h3>
+        {!loading && historyBookings.length === 0 && (
           <p className="text-sm text-slate-400">
             No bookings yet. Once a booking is completed or cancelled, it will show up here.
           </p>
         )}
-
-        {historyOpen && historyBookings.length > 0 && (
+        {historyBookings.length > 0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b">
                 <th className="pb-2">Service</th>
                 <th>Provider</th>
                 <th>Date</th>
-                <th>Pay</th>
+                <th>Amount</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th></th>
               </tr>
             </thead>
@@ -280,32 +350,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                   <td className="py-2">{h.service}</td>
                   <td>{h.provider}</td>
                   <td>{h.date}</td>
-                  <td>
-                    {h.status === "Completed" ? (
-                      <button
-                        onClick={() => handlePay(h)}
-                        disabled={payingId === h._id || h.paymentStatus === "Paid"}
-                        className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-                      >
-                        <CreditCard size={12} />
-                        {h.paymentStatus === "Paid"
-                          ? "Paid"
-                          : payingId === h._id
-                          ? "Paying..."
-                          : `Pay ৳${h.amount} now`}
-                      </button>
-                    ) : (
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          h.paymentStatus === "Refunded"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {h.paymentStatus === "Refunded" ? "Refunded" : "Not Refunded"}
-                      </span>
-                    )}
-                  </td>
+                  <td>৳ {h.amount}</td>
                   <td>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -316,6 +361,59 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
                     >
                       {h.status}
                     </span>
+                  </td>
+                  <td>
+                    {/* Feature 11 — Payment Integration. Held back for Sprint 3
+                        (see src/config/featureFlags.js). */}
+                    {featureFlags.payment ? (
+                      h.status === "Completed" && h.paymentStatus !== "Paid" ? (
+                        h.paymentMethod === "Cash" ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">
+                            Awaiting cash confirmation
+                          </span>
+                        ) : h.paymentMethod === "Online" ? (
+                          <button
+                            onClick={() => handlePay(h)}
+                            disabled={payingId === h._id}
+                            className="flex items-center gap-1 bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                          >
+                            <CreditCard size={12} />
+                            {payingId === h._id ? "Redirecting..." : `Pay ৳${h.amount} now`}
+                          </button>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => choosePaymentMethod(h, "Online")}
+                              disabled={choosingMethodId === h._id}
+                              className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              Pay online
+                            </button>
+                            <button
+                              onClick={() => choosePaymentMethod(h, "Cash")}
+                              disabled={choosingMethodId === h._id}
+                              className="border border-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                            >
+                              Pay in cash
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            h.paymentStatus === "Paid"
+                              ? "bg-green-100 text-green-700"
+                              : h.paymentStatus === "Refunded"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {h.paymentStatus}{h.paymentStatus === "Paid" && h.paymentMethod === "Cash" ? " (cash)" : ""}
+                        </span>
+                      )
+                    ) : (
+                      <ComingSoon compact />
+                    )}
                   </td>
                   <td>
                     {h.status === "Completed" && (
@@ -335,6 +433,7 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         )}
       </div>
 
+      {/* Simple message modal (replaces alert()) */}
       <AppModal
         open={modal.open}
         type="message"
@@ -343,11 +442,12 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
         onClose={closeModal}
       />
 
+      {/* Cancel confirmation modal (replaces prompt()/confirm()) */}
       <AppModal
         open={Boolean(cancelTarget)}
         type="confirm"
         title="Cancel this booking?"
-        message={cancelTarget ? refundHintFor(cancelTarget) : ""}
+        message={cancelTarget ? refundHintFor(cancelTarget, partialRefundPercent) : ""}
         showReasonInput
         reason={cancelReason}
         onReasonChange={setCancelReason}

@@ -40,7 +40,7 @@ export default function CustomerDashboard() {
       case "reviews":
         return <MyReviews />;
       case "notifications":
-        return <Notifications />;
+        return <Notifications setActiveTab={setActiveTab} />;
       case "chat":
         return <Chat />;
       default:

@@ -31,6 +31,7 @@ export default function SearchAndBook() {
 
   const [formError, setFormError] = useState("");
 
+  // Manual "Book a Service" modal — customer types provider + service name freely
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [providerText, setProviderText] = useState("");
   const [serviceText, setServiceText] = useState("");
@@ -100,7 +101,6 @@ export default function SearchAndBook() {
     setDate("");
     setTime("");
     setNotes("");
-    setFormError("");
     setAddress(user?.address || "");
   };
 
@@ -119,16 +119,19 @@ export default function SearchAndBook() {
         address,
         notes,
       });
-      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
       setConfirmedFor(service);
       setExpandedServiceId(null);
     } catch (err) {
-      setFormError(err.response?.data?.message || "Could not create booking.");
+      alert(err.response?.data?.message || "Could not create booking.");
     } finally {
       setBooking(false);
     }
   };
 
+  // ---- Manual booking modal helpers ----
   const openManualModal = () => {
     setManualModalOpen(true);
     setProviderText("");
@@ -182,7 +185,9 @@ export default function SearchAndBook() {
         address: manualAddress,
         notes: manualNotes,
       });
-      updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
       setManualConfirmed(matchedService);
       loadServices();
     } catch (err) {
@@ -304,32 +309,72 @@ export default function SearchAndBook() {
           return (
             <div key={s._id} className="bg-white rounded-xl p-4 shadow-sm">
               <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold">{s.provider?.name}</h4>
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        s.provider?.providerProfile?.availability === "busy" ? "bg-yellow-500" : "bg-green-500"
-                      }`}
-                      title={s.provider?.providerProfile?.availability === "busy" ? "Busy" : "Online"}
-                    />
-                    <span className="text-xs text-slate-400">
-                      {s.provider?.providerProfile?.availability === "busy" ? "Busy" : "Online"}
-                    </span>
-                    {s.provider?.providerProfile?.reviewCount > 0 && (
-                      <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                        <Star size={11} className="fill-amber-500 text-amber-500" />
-                        {s.provider.providerProfile.avgRating?.toFixed(1)}
-                        <span className="text-amber-500 font-normal">({s.provider.providerProfile.reviewCount})</span>
-                      </span>
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                    {s.provider?.providerProfile?.photoUrl ? (
+                      <img
+                        src={s.provider.providerProfile.photoUrl}
+                        alt={s.provider?.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-slate-400 text-[10px]">No photo</span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500">
-                    {s.title} · {s.category}
-                    {s.provider?.providerProfile?.serviceArea && (
-                      <> · <MapPin size={12} className="inline" /> {s.provider.providerProfile.serviceArea}</>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold">{s.provider?.name}</h4>
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          s.provider?.providerProfile?.availability === "busy" ? "bg-yellow-500" : "bg-green-500"
+                        }`}
+                        title={s.provider?.providerProfile?.availability === "busy" ? "Busy" : "Online"}
+                      />
+                      <span className="text-xs text-slate-400">
+                        {s.provider?.providerProfile?.availability === "busy" ? "Busy" : "Online"}
+                      </span>
+                      {s.provider?.providerProfile?.reviewCount > 0 && (
+                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                          <Star size={11} className="fill-amber-500 text-amber-500" />
+                          {s.provider.providerProfile.avgRating?.toFixed(1)}
+                          <span className="text-amber-500 font-normal">({s.provider.providerProfile.reviewCount})</span>
+                        </span>
+                      )}
+                      {s.provider?.providerProfile?.experienceYears > 0 && (
+                        <span className="text-xs text-slate-400">
+                          · {s.provider.providerProfile.experienceYears} yrs exp.
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-500">
+                      {s.title} · {s.category}
+                      {s.provider?.providerProfile?.serviceArea && (
+                        <> · <MapPin size={12} className="inline" /> {s.provider.providerProfile.serviceArea}</>
+                      )}
+                    </p>
+                    {s.provider?.providerProfile?.bio && (
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                        {s.provider.providerProfile.bio}
+                      </p>
                     )}
-                  </p>
+                    {s.provider?.providerProfile?.skills?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {s.provider.providerProfile.skills.slice(0, 4).map((sk) => (
+                          <span
+                            key={sk}
+                            className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full"
+                          >
+                            {sk}
+                          </span>
+                        ))}
+                        {s.provider.providerProfile.skills.length > 4 && (
+                          <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full">
+                            +{s.provider.providerProfile.skills.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button onClick={() => toggleSaved(s.provider?._id)} title="Save provider">
                   <Heart
@@ -363,12 +408,12 @@ export default function SearchAndBook() {
 
               {isExpanded && (
                 <div className="border-t mt-4 pt-4">
-                  {formError && (
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    {formError && (
                     <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
                       {formError}
                     </p>
-                  )}
-                  <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    )}
                     <Calendar size={14} className="text-orange-500" /> Select date
                   </p>
                   <input
@@ -525,11 +570,31 @@ export default function SearchAndBook() {
 
                 {matchedService ? (
                   <div className="border-t pt-4">
-                    <div className="flex justify-between items-center text-sm mb-3">
-                      <span className="text-slate-500">
-                        {matchedService.category} · {matchedService.provider?.name}
-                      </span>
-                      <span className="font-bold text-orange-500">৳ {matchedService.price}</span>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                        {matchedService.provider?.providerProfile?.photoUrl ? (
+                          <img
+                            src={matchedService.provider.providerProfile.photoUrl}
+                            alt={matchedService.provider?.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-slate-400 text-[9px]">No photo</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500">
+                            {matchedService.category} · {matchedService.provider?.name}
+                          </span>
+                          <span className="font-bold text-orange-500">৳ {matchedService.price}</span>
+                        </div>
+                        {matchedService.provider?.providerProfile?.skills?.length > 0 && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {matchedService.provider.providerProfile.skills.slice(0, 3).join(", ")}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     {matchedService.provider?.providerProfile?.availability === "busy" ? (

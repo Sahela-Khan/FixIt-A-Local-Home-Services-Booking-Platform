@@ -44,6 +44,7 @@ export default function ProviderOverview() {
   const [listingForm, setListingForm] = useState({ title: "", category: "", price: "", estDurationMins: "", description: "" });
   const [savingListing, setSavingListing] = useState(false);
   const [editingId, setEditingId] = useState(null); // null = create mode, else listing _id
+  const [confirmingCashId, setConfirmingCashId] = useState(null);
 
   const availability = user?.providerProfile?.availability || "offline";
 
@@ -103,6 +104,18 @@ export default function ProviderOverview() {
       loadAll();
     } catch (err) {
       alert(err.response?.data?.message || "Could not update status.");
+    }
+  };
+
+  const confirmCashReceived = async (bookingId) => {
+    setConfirmingCashId(bookingId);
+    try {
+      await api.put(`/provider/bookings/${bookingId}/cash-received`);
+      loadAll();
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not confirm cash payment.");
+    } finally {
+      setConfirmingCashId(null);
     }
   };
 
@@ -296,7 +309,22 @@ export default function ProviderOverview() {
                       <td>{b.status}</td>
                       <td>{b.date}</td>
                       <td>{b.status}</td>
-                      <td>{b.paymentStatus}</td>
+                      <td>
+                        {b.paymentMethod === "Cash" && b.paymentStatus !== "Paid" ? (
+                          <button
+                            onClick={() => confirmCashReceived(b._id)}
+                            disabled={confirmingCashId === b._id}
+                            className="bg-slate-800 text-white text-xs font-semibold px-2.5 py-1 rounded-lg disabled:opacity-60 whitespace-nowrap"
+                          >
+                            {confirmingCashId === b._id ? "Confirming..." : "Mark cash received"}
+                          </button>
+                        ) : (
+                          <>
+                            {b.paymentStatus}
+                            {b.paymentStatus === "Paid" && b.paymentMethod === "Cash" ? " (cash)" : ""}
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

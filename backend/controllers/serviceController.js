@@ -2,7 +2,7 @@ const Service = require("../models/Service");
 const User = require("../models/User");
 
 // @desc  Search / browse approved services (with optional filters)
-// @route GET /api/services?keyword=&category=&location=&maxPrice=
+// @route GET /api/services?keyword=&category=&location=&maxPrice=&sortBy=
 // @access Private (customer)
 exports.listServices = async (req, res) => {
   try {
@@ -13,14 +13,16 @@ exports.listServices = async (req, res) => {
     if (maxPrice) filter.price = { $lte: Number(maxPrice) };
 
     let services = await Service.find(filter)
-      .populate("provider", "name providerProfile.serviceArea providerProfile.availability providerProfile.avgRating providerProfile.reviewCount providerProfile.verificationStatus")
+      .populate("provider", "name providerProfile")
       .sort({ createdAt: -1 });
 
-    // Only verified, online/busy providers should appear in customer search results
+    // Only non-offline, non-suspended providers should appear in customer
+    // search results. Suspension is applied after the fact (e.g. a
+    // fake-looking NID) — see Feature 1 — rather than as a pre-approval gate.
     services = services.filter(
       (s) =>
         s.provider?.providerProfile?.availability !== "offline" &&
-        s.provider?.providerProfile?.verificationStatus === "verified"
+        !s.provider?.providerProfile?.suspended
     );
 
     // Free-text search: match the keyword against service name, category, OR
@@ -52,7 +54,7 @@ exports.listServices = async (req, res) => {
     // price and rating are re-sorted here since they depend on
     // fields (price, provider.providerProfile.avgRating) that aren't
     // practical to sort at the query level once the availability/
-    // verification/keyword filters above have already run in JS.
+    // suspension/keyword filters above have already run in JS.
     const sortOption = sortBy || "newest";
     if (sortOption === "price-low") {
       services.sort((a, b) => a.price - b.price);
@@ -75,22 +77,22 @@ exports.listServices = async (req, res) => {
 };
 
 // @desc  Distinct list of provider locations, drawn from approved services of
-//        verified, online/busy providers — used to populate the location filter
-//        dropdown so it stays in sync as new providers get approved.
+//        non-suspended, online/busy providers — used to populate the location
+//        filter dropdown so it stays in sync as new providers get approved.
 // @route GET /api/services/locations
 // @access Private (customer)
 exports.listLocations = async (req, res) => {
   try {
     const services = await Service.find({ approvalStatus: "approved", isActive: true }).populate(
       "provider",
-      "providerProfile.serviceArea providerProfile.availability providerProfile.verificationStatus"
+      "providerProfile"
     );
 
     const areas = new Set();
     services.forEach((s) => {
       const profile = s.provider?.providerProfile;
       if (
-        profile?.verificationStatus === "verified" &&
+        !profile?.suspended &&
         profile?.availability !== "offline" &&
         profile?.serviceArea
       ) {

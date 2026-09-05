@@ -1,32 +1,44 @@
-import { useAuth } from "../context/AuthContext";
-
-const CARD =
-  "rounded-lg border border-line border-l-4 border-l-brand bg-surface px-[1.4rem] py-5";
-const CARD_TITLE = "m-0 mb-[0.4rem] text-[1.05rem] font-bold";
-const CARD_TEXT = "m-0 text-[0.92rem] text-ink-soft";
+import { useState } from "react";
+import { LayoutDashboard, UserCircle, Star, Bell, MessageCircle } from "lucide-react";
+import Sidebar from "../components/Sidebar";
+import ProviderOverview from "../components/ProviderOverview";
+import ProviderProfile from "./ProviderProfile";
+import ProviderReviews from "../components/ProviderReviews";
+import Notifications from "../components/Notifications";
+import Chat from "./Chat";
 
 export default function ProviderDashboard() {
-  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const menu = [
+    { name: "Dashboard", icon: LayoutDashboard, tab: "dashboard" },
+    { name: "My Profile Setup", icon: UserCircle, tab: "profile" },
+    { name: "Rating and Review", icon: Star, tab: "reviews" },
+    { name: "Notifications", icon: Bell, tab: "notifications" },
+    { name: "Messages", icon: MessageCircle, tab: "chat" },
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <ProviderOverview />;
+      case "profile":
+        return <ProviderProfile embedded />;
+      case "reviews":
+        return <ProviderReviews />;
+      case "notifications":
+        return <Notifications setActiveTab={setActiveTab} />;
+      case "chat":
+        return <Chat />;
+      default:
+        return <ProviderOverview />;
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-[1000px] px-6 py-10">
-      <h2 className="mb-1 text-2xl font-bold">Welcome, {user?.name}</h2>
-      <p className="mt-0 text-[0.95rem] text-ink-soft">
-        You are logged in as a service provider.
-      </p>
-      <div className="mt-7 grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-5">
-        <div className={CARD}>
-          <h3 className={CARD_TITLE}>My profile</h3>
-          <p className={CARD_TEXT}>Skills, area &amp; photo setup (Feature 2) will live here.</p>
-        </div>
-        <div className={CARD}>
-          <h3 className={CARD_TITLE}>My listings</h3>
-          <p className={CARD_TEXT}>Service listings (Feature 3) will live here.</p>
-        </div>
-        <div className={CARD}>
-          <h3 className={CARD_TITLE}>Incoming requests</h3>
-          <p className={CARD_TEXT}>Booking requests &amp; earnings (Feature 8) will live here.</p>
-        </div>
-      </div>
+    <div className="flex">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} menu={menu} />
+      <div className="flex-1 bg-slate-50">{renderContent()}</div>
     </div>
   );
 }

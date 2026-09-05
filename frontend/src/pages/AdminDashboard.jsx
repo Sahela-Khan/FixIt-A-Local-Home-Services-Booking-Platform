@@ -1,34 +1,56 @@
 import { useState } from "react";
-import AdminSidebar from "../components/AdminSidebar";
+import { LayoutDashboard, Users, ShieldCheck, Star, Banknote, ShieldAlert, Tags, Ticket } from "lucide-react";
+import Sidebar from "../components/Sidebar";
 import AdminOverview from "./admin/AdminOverview";
 import AdminUsers from "./admin/AdminUsers";
 import AdminApprovals from "./admin/AdminApprovals";
+import AdminReviews from "./admin/AdminReviews";
+import AdminRefunds from "./admin/AdminRefunds";
 import AdminDisputes from "./admin/AdminDisputes";
 import AdminCategories from "./admin/AdminCategories";
 import AdminCoupons from "./admin/AdminCoupons";
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState("Overview");
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const menu = [
+    { name: "Overview", icon: LayoutDashboard, tab: "overview" },
+    { name: "Users", icon: Users, tab: "users" },
+    { name: "Approvals", icon: ShieldCheck, tab: "approvals" },
+    { name: "Reviews", icon: Star, tab: "reviews" },
+    { name: "Refunds", icon: Banknote, tab: "refunds" },
+    { name: "Disputes", icon: ShieldAlert, tab: "disputes" },
+    { name: "Categories", icon: Tags, tab: "categories" },
+    { name: "Coupons", icon: Ticket, tab: "coupons" },
+  ];
 
   const renderContent = () => {
-    if (tab === "Users") return <AdminUsers />;
-    if (tab === "Approvals") return <AdminApprovals />;
-    if (tab === "Disputes") return <AdminDisputes />;
-    if (tab === "Categories") return <AdminCategories />;
-    if (tab === "Coupons") return <AdminCoupons />;
-    return <AdminOverview />;
+    switch (activeTab) {
+      case "overview":
+        return <AdminOverview />;
+      case "users":
+        return <AdminUsers />;
+      case "approvals":
+        return <AdminApprovals />;
+      case "reviews":
+        return <AdminReviews />;
+      case "refunds":
+        return <AdminRefunds />;
+      case "disputes":
+        return <AdminDisputes />;
+      case "categories":
+        return <AdminCategories />;
+      case "coupons":
+        return <AdminCoupons />;
+      default:
+        return <AdminOverview />;
+    }
   };
 
   return (
     <div className="flex">
-      <AdminSidebar activeTab={tab} setActiveTab={setTab} />
-      <div className="min-h-screen flex-1 bg-paper p-8">
-        <h2 className="mb-1 text-2xl font-bold">{tab}</h2>
-        <p className="mb-7 mt-0 text-[0.95rem] text-ink-soft">
-          Manage the FixIt platform from a single place.
-        </p>
-        {renderContent()}
-      </div>
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} menu={menu} />
+      <div className="flex-1 bg-slate-50 p-8">{renderContent()}</div>
     </div>
   );
 }

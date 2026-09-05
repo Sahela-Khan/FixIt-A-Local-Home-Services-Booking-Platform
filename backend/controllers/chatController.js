@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const { notify } = require("./notificationController");
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -159,6 +160,13 @@ exports.sendMessage = async (req, res) => {
     await conversation.save();
 
     const populated = await message.populate("sender", "name role");
+
+    const recipientId = conversation.participants.find(
+      (p) => p.toString() !== req.user.id
+    );
+    if (recipientId) {
+      await notify(recipientId, `New message from ${populated.sender?.name || "someone"}: ${content.slice(0, 50)}`, "general");
+    }
     return res.status(201).json({ message: populated });
   } catch (err) {
     console.error("Send message error:", err);
