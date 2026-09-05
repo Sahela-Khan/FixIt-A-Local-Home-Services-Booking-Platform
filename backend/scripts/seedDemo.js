@@ -15,7 +15,6 @@ const Service = require("../models/Service");
         phone: "01700000000",
         passwordHash: "demo123456",
         role: "provider",
-        providerProfile: { verificationStatus: "verified" },
       });
       console.log("Demo provider created (demo.provider@fixit.com / demo123456)");
     } else {

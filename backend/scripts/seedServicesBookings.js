@@ -4,10 +4,9 @@
  * Use this after you've manually inserted your 20 providers + 20 customers
  * into MongoDB Atlas via the Data Explorer.
  *
- * NOTE: as of the admin-verification feature, only providers with
- * providerProfile.verificationStatus === "verified" show up in customer
- * Search & Book. Make sure your manually-inserted providers have that field
- * set, or approve them from Admin > Approvals in the app after seeding.
+ * NOTE: providers show up in customer Search & Book as soon as one of
+ * their services is admin-approved — identity/NID upload does not gate
+ * search visibility.
  *
  * Run from the backend/ folder:
  *   node scripts/seedServicesBookings.js

@@ -16,13 +16,11 @@ exports.listServices = async (req, res) => {
       .populate("provider", "name providerProfile")
       .sort({ createdAt: -1 });
 
-    // FR (Identity Verification): only show services from providers whose
-    // identity has been verified by an admin. Service approval and identity
-    // verification are separate flows — a service can be approved while its
-    // provider is still unverified, so this filter is applied after populate
-    // rather than in the Service query itself.
+    // Providers can be suspended after the fact (e.g. a fake-looking NID) —
+    // suspension isn't a pre-approval gate, but it does hide their services
+    // from customer search immediately.
     const visibleServices = services.filter(
-      (s) => s.provider?.providerProfile?.verificationStatus === "verified"
+      (s) => !s.provider?.providerProfile?.suspended
     );
 
     return res.status(200).json({ services: visibleServices });

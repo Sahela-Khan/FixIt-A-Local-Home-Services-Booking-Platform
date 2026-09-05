@@ -22,10 +22,10 @@ export default function AdminApprovals() {
 
   const loadProviders = () =>
     api
-      .get("/admin/providers/pending-verification")
+      .get("/admin/providers/nids")
       .then((res) => setProviders(res.data.providers))
       .catch((err) =>
-        setError(err.response?.data?.message || "Failed to load pending verifications.")
+        setError(err.response?.data?.message || "Failed to load provider NIDs.")
       );
 
   useEffect(() => {
@@ -46,13 +46,28 @@ export default function AdminApprovals() {
     }
   };
 
-  const reviewProvider = async (id, action) => {
+  const toggleSuspend = async (id, suspend) => {
+    if (suspend) {
+      const raw = window.prompt("Reason for suspending this provider (optional):");
+      if (raw === null) return; // cancelled
+      const reason = raw || "";
+      setBusyId(id);
+      setError("");
+      try {
+        const res = await api.put(`/admin/providers/${id}/suspend`, { reason });
+        setProviders((list) => list.map((p) => (p._id === id ? res.data.provider : p)));
+      } catch (err) {
+        setError(err.response?.data?.message || "Action failed.");
+      } finally {
+        setBusyId(null);
+      }
+      return;
+    }
     setBusyId(id);
     setError("");
     try {
-      const route = action === "verify" ? "verify" : "reject-verification";
-      await api.put(`/admin/providers/${id}/${route}`);
-      setProviders((list) => list.filter((p) => p._id !== id));
+      const res = await api.put(`/admin/providers/${id}/unsuspend`);
+      setProviders((list) => list.map((p) => (p._id === id ? res.data.provider : p)));
     } catch (err) {
       setError(err.response?.data?.message || "Action failed.");
     } finally {
@@ -71,17 +86,20 @@ export default function AdminApprovals() {
     <>
       {error && <div className={ALERT}>{error}</div>}
 
-      <h3 className="m-0 mb-3 text-[1.05rem] font-bold">Provider verification requests</h3>
+      <h3 className="m-0 mb-3 text-[1.05rem] font-bold">Provider NIDs on file</h3>
       {providers.length === 0 ? (
         <p className="mt-0 mb-6 text-[0.95rem] text-slate-500">
-          No providers waiting for verification. Requests appear here once a
-          provider adds their NID and clicks "Get verified".
+          No providers have uploaded an NID yet.
         </p>
       ) : (
         <div className="mb-8 flex flex-col gap-4">
           {providers.map((p) => (
             <div
-              className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 border-l-4 border-l-orange-500 bg-white px-[1.3rem] py-[1.1rem] max-[700px]:flex-col max-[700px]:items-stretch"
+              className={`flex items-center justify-between gap-4 rounded-lg border bg-white px-[1.3rem] py-[1.1rem] max-[700px]:flex-col max-[700px]:items-stretch ${
+                p.providerProfile?.suspended
+                  ? "border-red-200 border-l-4 border-l-[#c0392b]"
+                  : "border-slate-200"
+              }`}
               key={p._id}
             >
               <div className="flex items-center gap-4">
@@ -95,30 +113,38 @@ export default function AdminApprovals() {
                 <div>
                   <h3 className="m-0 mb-[0.3rem] text-[1.05rem] font-bold">{p.name}</h3>
                   <div className="flex flex-wrap items-center gap-3 text-[0.85rem] text-slate-500">
-                    <span className="ml-[0.45rem] inline-block rounded-full bg-[#fdeed3] px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em] text-[#a06a04]">
-                      pending
-                    </span>
+                    {p.providerProfile?.suspended && (
+                      <span className="inline-block rounded-full bg-red-100 px-[0.55rem] py-[0.18rem] text-[0.72rem] font-bold uppercase tracking-[0.05em] text-red-700">
+                        suspended
+                      </span>
+                    )}
                     <span>{p.email}</span>
-                    <span>{p.phone}</span>
-                    <span>NID: {p.providerProfile?.nidNumber || "—"}</span>
                   </div>
+                  {p.providerProfile?.suspended && p.providerProfile?.suspensionReason && (
+                    <p className="mt-1 text-[0.8rem] text-red-600">
+                      Reason: {p.providerProfile.suspensionReason}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2 max-[700px]:justify-end">
-                <button
-                  className={`${BTN_SMALL} bg-[#1e8e5a] text-white hover:bg-[#177248]`}
-                  disabled={busyId === p._id}
-                  onClick={() => reviewProvider(p._id, "verify")}
-                >
-                  Approve
-                </button>
-                <button
-                  className={`${BTN_SMALL} bg-[#c0392b] text-white hover:bg-[#a03024]`}
-                  disabled={busyId === p._id}
-                  onClick={() => reviewProvider(p._id, "reject")}
-                >
-                  Reject
-                </button>
+                {p.providerProfile?.suspended ? (
+                  <button
+                    className={`${BTN_SMALL} bg-[#1e8e5a] text-white hover:bg-[#177248]`}
+                    disabled={busyId === p._id}
+                    onClick={() => toggleSuspend(p._id, false)}
+                  >
+                    Unsuspend
+                  </button>
+                ) : (
+                  <button
+                    className={`${BTN_SMALL} bg-[#c0392b] text-white hover:bg-[#a03024]`}
+                    disabled={busyId === p._id}
+                    onClick={() => toggleSuspend(p._id, true)}
+                  >
+                    Suspend
+                  </button>
+                )}
               </div>
             </div>
           ))}

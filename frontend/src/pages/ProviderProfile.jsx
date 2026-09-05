@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, ShieldCheck, Clock, CheckCircle2, Circle, Lightbulb, ChevronRight, ChevronLeft, Star, XCircle, IdCard } from "lucide-react";
+import { Upload, ShieldCheck, CheckCircle2, Circle, Lightbulb, ChevronRight, ChevronLeft, Star, IdCard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import ComingSoon from "../components/ComingSoon";
@@ -24,15 +24,10 @@ export default function ProviderProfile({ embedded = false }) {
     serviceArea: user?.providerProfile?.serviceArea || "",
     bio: user?.providerProfile?.bio || "",
     photoUrl: user?.providerProfile?.photoUrl || "",
-    nidNumber: user?.providerProfile?.nidNumber || "",
     nidPhotoUrl: user?.providerProfile?.nidPhotoUrl || "",
   });
   const [saving, setSaving] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState("");
 
-  const verificationStatus = user?.providerProfile?.verificationStatus || "unverified";
-  const verificationNote = user?.providerProfile?.verificationNote || "";
   const skillsList = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
 
   const checklist = [
@@ -40,7 +35,7 @@ export default function ProviderProfile({ embedded = false }) {
     { label: "Skills added", done: skillsList.length > 0 },
     { label: "Service area added", done: Boolean(form.serviceArea) },
     { label: "Profile photo added", done: Boolean(form.photoUrl) },
-    { label: "NID uploaded", done: Boolean(form.nidNumber && form.nidPhotoUrl) },
+    { label: "NID uploaded", done: Boolean(form.nidPhotoUrl) },
   ];
   const strengthPct = Math.round((checklist.filter((c) => c.done).length / checklist.length) * 100);
   const strengthLabel = strengthPct === 100 ? "Great" : strengthPct >= 50 ? "Good" : "Needs work";
@@ -83,22 +78,6 @@ export default function ProviderProfile({ embedded = false }) {
     }
   };
 
-  const handleVerify = async () => {
-    setVerifying(true);
-    setVerifyError("");
-    try {
-      // Save the latest NID info first so the admin sees up-to-date details.
-      const ok = await handleSave();
-      if (!ok) return;
-      const res = await api.put("/provider/profile/request-verification");
-      updateUser({ providerProfile: { ...user.providerProfile, ...form, verificationStatus: res.data.verificationStatus } });
-    } catch (err) {
-      setVerifyError(err.response?.data?.message || "Could not request verification.");
-    } finally {
-      setVerifying(false);
-    }
-  };
-
   const goNext = async () => {
     if (step < 4) {
       await handleSave();
@@ -131,18 +110,8 @@ export default function ProviderProfile({ embedded = false }) {
                 <IdCard size={16} className="text-orange-500" /> Identity Verification
               </h4>
               <p className="text-xs text-slate-500 mb-3">
-                Add your NID number and a photo of your NID so an admin can verify your account.
-                Only verified providers show up in customer search results.
+                Upload a photo of your NID for our records.
               </p>
-
-              <label className="text-xs font-semibold text-slate-500">NID Number</label>
-              <input
-                value={form.nidNumber}
-                onChange={(e) => setForm({ ...form, nidNumber: e.target.value })}
-                placeholder="e.g. 1990123456789"
-                disabled={verificationStatus === "verified" || verificationStatus === "pending"}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 mb-3 disabled:bg-slate-50 disabled:text-slate-400"
-              />
 
               <input
                 ref={nidFileInputRef}
@@ -154,8 +123,7 @@ export default function ProviderProfile({ embedded = false }) {
               <button
                 type="button"
                 onClick={() => nidFileInputRef.current?.click()}
-                disabled={verificationStatus === "verified" || verificationStatus === "pending"}
-                className="w-full border border-dashed rounded-lg px-4 py-5 text-center text-sm text-slate-500 disabled:opacity-60"
+                className="w-full border border-dashed rounded-lg px-4 py-5 text-center text-sm text-slate-500"
               >
                 <Upload size={18} className="mx-auto mb-1" />
                 {form.nidPhotoUrl ? "Change NID photo" : "Upload NID photo"}
@@ -165,46 +133,10 @@ export default function ProviderProfile({ embedded = false }) {
                 <img src={form.nidPhotoUrl} alt="NID preview" className="mt-2 max-h-32 rounded-lg border" />
               )}
 
-              {verificationStatus === "verified" && (
+              {form.nidPhotoUrl && (
                 <div className="mt-4 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  <ShieldCheck size={16} /> Your account is verified. Your services are visible to customers.
+                  <ShieldCheck size={16} /> NID on file.
                 </div>
-              )}
-
-              {verificationStatus === "pending" && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-                  <Clock size={16} /> Verification request sent — waiting for admin review.
-                </div>
-              )}
-
-              {verificationStatus === "rejected" && (
-                <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  <p className="flex items-center gap-2 font-semibold">
-                    <XCircle size={16} /> Verification request rejected
-                  </p>
-                  {verificationNote && <p className="mt-1 text-red-600">Reason: {verificationNote}</p>}
-                  <p className="mt-1 text-red-600">Update your NID details above and request again.</p>
-                </div>
-              )}
-
-              {verifyError && (
-                <p className="text-xs text-red-500 mt-3">{verifyError}</p>
-              )}
-
-              {(verificationStatus === "unverified" || verificationStatus === "rejected") && (
-                <button
-                  type="button"
-                  onClick={handleVerify}
-                  disabled={verifying || !form.nidNumber.trim() || !form.nidPhotoUrl}
-                  className="mt-4 w-full bg-orange-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50 disabled:bg-slate-300"
-                >
-                  {verifying ? "Sending request..." : "Get verified"}
-                </button>
-              )}
-              {verificationStatus === "unverified" && (!form.nidNumber.trim() || !form.nidPhotoUrl) && (
-                <p className="text-xs text-slate-400 mt-2">
-                  Add your NID number and photo above to request verification.
-                </p>
               )}
             </div>
           </div>
@@ -212,7 +144,7 @@ export default function ProviderProfile({ embedded = false }) {
           <div className="space-y-4">
             <div className="bg-blue-50 rounded-xl p-4 flex gap-2">
               <Lightbulb size={16} className="text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700">Identity verification is available now — full profile customization arrives in Sprint 3.</p>
+              <p className="text-xs text-blue-700">NID upload is available now — full profile customization arrives in Sprint 3.</p>
             </div>
           </div>
         </div>
@@ -344,25 +276,15 @@ export default function ProviderProfile({ embedded = false }) {
             <div>
               <h3 className="font-semibold mb-1">Preview</h3>
               <p className="text-sm text-slate-500 mb-4">This is what your public profile will look like.</p>
-              <ProfileCard user={user} form={form} skillsList={skillsList} verificationStatus={verificationStatus} />
+              <ProfileCard user={user} form={form} skillsList={skillsList} />
 
               <div className="mt-5 border-t pt-4">
                 <h4 className="font-semibold mb-1 flex items-center gap-2">
                   <IdCard size={16} className="text-orange-500" /> Identity Verification
                 </h4>
                 <p className="text-xs text-slate-500 mb-3">
-                  Add your NID number and a photo of your NID so an admin can verify your account.
-                  Only verified providers show up in customer search results.
+                  Upload a photo of your NID for our records.
                 </p>
-
-                <label className="text-xs font-semibold text-slate-500">NID Number</label>
-                <input
-                  value={form.nidNumber}
-                  onChange={(e) => setForm({ ...form, nidNumber: e.target.value })}
-                  placeholder="e.g. 1990123456789"
-                  disabled={verificationStatus === "verified" || verificationStatus === "pending"}
-                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1 mb-3 disabled:bg-slate-50 disabled:text-slate-400"
-                />
 
                 <input
                   ref={nidFileInputRef}
@@ -374,8 +296,7 @@ export default function ProviderProfile({ embedded = false }) {
                 <button
                   type="button"
                   onClick={() => nidFileInputRef.current?.click()}
-                  disabled={verificationStatus === "verified" || verificationStatus === "pending"}
-                  className="w-full border border-dashed rounded-lg px-4 py-5 text-center text-sm text-slate-500 disabled:opacity-60"
+                  className="w-full border border-dashed rounded-lg px-4 py-5 text-center text-sm text-slate-500"
                 >
                   <Upload size={18} className="mx-auto mb-1" />
                   {form.nidPhotoUrl ? "Change NID photo" : "Upload NID photo"}
@@ -385,46 +306,10 @@ export default function ProviderProfile({ embedded = false }) {
                   <img src={form.nidPhotoUrl} alt="NID preview" className="mt-2 max-h-32 rounded-lg border" />
                 )}
 
-                {verificationStatus === "verified" && (
+                {form.nidPhotoUrl && (
                   <div className="mt-4 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                    <ShieldCheck size={16} /> Your account is verified. Your services are visible to customers.
+                    <ShieldCheck size={16} /> NID on file.
                   </div>
-                )}
-
-                {verificationStatus === "pending" && (
-                  <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-                    <Clock size={16} /> Verification request sent — waiting for admin review.
-                  </div>
-                )}
-
-                {verificationStatus === "rejected" && (
-                  <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                    <p className="flex items-center gap-2 font-semibold">
-                      <XCircle size={16} /> Verification request rejected
-                    </p>
-                    {verificationNote && <p className="mt-1 text-red-600">Reason: {verificationNote}</p>}
-                    <p className="mt-1 text-red-600">Update your NID details above and request again.</p>
-                  </div>
-                )}
-
-                {verifyError && (
-                  <p className="text-xs text-red-500 mt-3">{verifyError}</p>
-                )}
-
-                {(verificationStatus === "unverified" || verificationStatus === "rejected") && (
-                  <button
-                    type="button"
-                    onClick={handleVerify}
-                    disabled={verifying || !form.nidNumber.trim() || !form.nidPhotoUrl}
-                    className="mt-4 w-full bg-orange-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50 disabled:bg-slate-300"
-                  >
-                    {verifying ? "Sending request..." : "Get verified"}
-                  </button>
-                )}
-                {verificationStatus === "unverified" && (!form.nidNumber.trim() || !form.nidPhotoUrl) && (
-                  <p className="text-xs text-slate-400 mt-2">
-                    Add your NID number and photo above to request verification.
-                  </p>
                 )}
               </div>
             </div>
@@ -474,7 +359,7 @@ export default function ProviderProfile({ embedded = false }) {
             </div>
           </div>
 
-          <ProfileCard user={user} form={form} skillsList={skillsList} verificationStatus={verificationStatus} compact />
+          <ProfileCard user={user} form={form} skillsList={skillsList} compact />
 
           <div className="bg-blue-50 rounded-xl p-4 flex gap-2">
             <Lightbulb size={16} className="text-blue-500 shrink-0 mt-0.5" />
@@ -487,7 +372,7 @@ export default function ProviderProfile({ embedded = false }) {
   );
 }
 
-function ProfileCard({ user, form, skillsList, verificationStatus, compact }) {
+function ProfileCard({ user, form, skillsList, compact }) {
   return (
     <div className={`bg-white rounded-xl shadow-sm p-5 ${compact ? "" : "border"}`}>
       {!compact && <h4 className="font-semibold mb-3">Profile Preview</h4>}
@@ -500,22 +385,7 @@ function ProfileCard({ user, form, skillsList, verificationStatus, compact }) {
           )}
         </div>
         <div>
-          <div className="flex items-center gap-2">
-            <p className="font-bold">{user?.name}</p>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                verificationStatus === "verified"
-                  ? "bg-green-100 text-green-700"
-                  : verificationStatus === "pending"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : verificationStatus === "rejected"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {verificationStatus}
-            </span>
-          </div>
+          <p className="font-bold">{user?.name}</p>
           {form.serviceArea && <p className="text-xs text-slate-500 mt-0.5">📍 {form.serviceArea}</p>}
         </div>
       </div>

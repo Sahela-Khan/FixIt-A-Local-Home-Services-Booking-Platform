@@ -89,6 +89,12 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    if (user.role === "provider" && user.providerProfile?.suspended) {
+      return res.status(403).json({
+        message: "Your provider account has been suspended. Contact support for details.",
+      });
+    }
+
     return sendAuthResponse(res, 200, user);
   } catch (err) {
     console.error("Login error:", err);

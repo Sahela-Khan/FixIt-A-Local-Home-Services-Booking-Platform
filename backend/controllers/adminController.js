@@ -209,50 +209,59 @@ exports.rejectService = reviewService("rejected");
 
 // ---------- PROVIDER VERIFICATION ----------
 
-exports.listPendingVerifications = async (req, res) => {
+// @desc  Read-only list of providers who have an NID on file, for the admin
+//        to view. There is no approve/reject step — uploading an NID does
+//        not gate search visibility or anything else; this is for the admin
+//        to be able to look at what's on file if needed.
+// @route GET /api/admin/providers/nids
+exports.listProviderNids = async (req, res) => {
   try {
     const providers = await User.find({
       role: "provider",
-      "providerProfile.verificationStatus": "pending",
-    }).sort({ updatedAt: 1 });
+      "providerProfile.nidPhotoUrl": { $ne: "" },
+    })
+      .select("name email providerProfile.nidPhotoUrl providerProfile.suspended providerProfile.suspensionReason")
+      .sort({ updatedAt: -1 });
     return res.json({ providers });
   } catch (err) {
-    console.error("Pending verifications error:", err);
-    return res.status(500).json({ message: "Failed to load pending verifications." });
+    console.error("List provider NIDs error:", err);
+    return res.status(500).json({ message: "Failed to load provider NIDs." });
   }
 };
 
-const reviewVerification = (decision) => async (req, res) => {
+// @desc  Suspend/unsuspend a provider after the fact (e.g. their NID looks
+//        fake on review). This is not a pre-approval step — providers are
+//        searchable by default from signup; suspension is how an admin
+//        pulls someone out of search and blocks their login once there's a
+//        concrete reason to.
+// @route PUT /api/admin/providers/:id/suspend
+// @route PUT /api/admin/providers/:id/unsuspend
+const setSuspension = (suspended) => async (req, res) => {
   try {
     if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: "Invalid provider id." });
     }
     const provider = await User.findOne({ _id: req.params.id, role: "provider" });
     if (!provider) return res.status(404).json({ message: "Provider not found." });
-    if (provider.providerProfile?.verificationStatus !== "pending") {
-      return res.status(409).json({
-        message: `This provider's verification is not pending (currently ${provider.providerProfile?.verificationStatus}).`,
-      });
-    }
 
-    provider.providerProfile.verificationStatus = decision;
-    provider.providerProfile.verificationNote = decision === "rejected" ? (req.body?.note || "") : "";
+    provider.providerProfile.suspended = suspended;
+    provider.providerProfile.suspensionReason = suspended ? (req.body?.reason || "") : "";
     await provider.save();
 
     await notify(
       provider._id,
-      decision === "verified"
-        ? "Your provider account has been verified by the admin. Your services are now visible to customers."
-        : `Your verification request was rejected by the admin.${req.body?.note ? ` Reason: ${req.body.note}` : ""}`,
+      suspended
+        ? `Your provider account has been suspended by the admin.${req.body?.reason ? ` Reason: ${req.body.reason}` : ""}`
+        : "Your provider account has been reinstated by the admin.",
       "general"
     );
 
     return res.json({ provider });
   } catch (err) {
-    console.error("Review verification error:", err);
-    return res.status(500).json({ message: "Failed to update verification status." });
+    console.error("Set suspension error:", err);
+    return res.status(500).json({ message: "Failed to update suspension status." });
   }
 };
 
-exports.approveVerification = reviewVerification("verified");
-exports.rejectVerification = reviewVerification("rejected");
+exports.suspendProvider = setSuspension(true);
+exports.unsuspendProvider = setSuspension(false);

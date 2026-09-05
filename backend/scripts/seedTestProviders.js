@@ -101,8 +101,6 @@ async function run() {
         serviceArea: pick(LOCATIONS),
         bio: `Experienced home service professional serving ${pick(LOCATIONS)}.`,
         availability: pick(AVAILABILITY),
-        verificationStatus: "verified",
-        nidNumber: `${1000000000 + i}`,
         nidPhotoUrl: "",
         avgRating,
         reviewCount,

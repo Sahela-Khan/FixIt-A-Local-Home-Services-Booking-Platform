@@ -69,14 +69,13 @@ exports.updateListing = async (req, res) => {
 // @route PUT /api/provider/profile
 exports.setupProfile = async (req, res) => {
   try {
-    const { skills, experienceYears, serviceArea, bio, photoUrl, nidNumber, nidPhotoUrl } = req.body;
+    const { skills, experienceYears, serviceArea, bio, photoUrl, nidPhotoUrl } = req.body;
     const update = {};
     if (skills !== undefined) update["providerProfile.skills"] = Array.isArray(skills) ? skills : String(skills).split(",").map((s) => s.trim()).filter(Boolean);
     if (experienceYears !== undefined) update["providerProfile.experienceYears"] = Number(experienceYears);
     if (serviceArea !== undefined) update["providerProfile.serviceArea"] = serviceArea;
     if (bio !== undefined) update["providerProfile.bio"] = bio;
     if (photoUrl !== undefined) update["providerProfile.photoUrl"] = photoUrl;
-    if (nidNumber !== undefined) update["providerProfile.nidNumber"] = nidNumber;
     if (nidPhotoUrl !== undefined) update["providerProfile.nidPhotoUrl"] = nidPhotoUrl;
 
     const user = await User.findByIdAndUpdate(req.user.id, update, { new: true });
@@ -84,40 +83,6 @@ exports.setupProfile = async (req, res) => {
   } catch (err) {
     console.error("setupProfile error:", err);
     return res.status(500).json({ message: "Server error while updating profile." });
-  }
-};
-
-// @desc  Provider submits a verification request (needs NID on file) — goes to "pending"
-//        until an admin approves or rejects it from the Admin > Approvals screen.
-// @route PUT /api/provider/profile/request-verification
-exports.requestVerification = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "Provider not found." });
-
-    if (user.providerProfile?.verificationStatus === "verified") {
-      return res.status(400).json({ message: "You're already verified." });
-    }
-    if (user.providerProfile?.verificationStatus === "pending") {
-      return res.status(400).json({ message: "Your verification request is already pending admin review." });
-    }
-    if (!user.providerProfile?.nidNumber || !user.providerProfile?.nidPhotoUrl) {
-      return res.status(400).json({ message: "Please add your NID number and upload an NID photo before requesting verification." });
-    }
-
-    user.providerProfile.verificationStatus = "pending";
-    user.providerProfile.verificationNote = "";
-    await user.save();
-    await notify(
-      user._id,
-      "Your verification request has been sent to the admin for review.",
-      "general"
-    );
-
-    return res.status(200).json({ verificationStatus: user.providerProfile.verificationStatus });
-  } catch (err) {
-    console.error("requestVerification error:", err);
-    return res.status(500).json({ message: "Server error while requesting verification." });
   }
 };
 

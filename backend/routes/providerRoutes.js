@@ -11,7 +11,6 @@ router.put("/services/:id", providerController.updateListing);
 
 router.put("/availability", providerController.setAvailability);
 router.put("/profile", providerController.setupProfile);
-router.put("/profile/request-verification", providerController.requestVerification);
 
 router.get("/bookings/incoming", providerController.getIncomingBookings);
 router.get("/bookings/schedule", providerController.getSchedule);
