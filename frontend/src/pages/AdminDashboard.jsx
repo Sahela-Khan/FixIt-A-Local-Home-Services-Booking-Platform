@@ -4,6 +4,7 @@ import AdminOverview from "./admin/AdminOverview";
 import AdminUsers from "./admin/AdminUsers";
 import AdminApprovals from "./admin/AdminApprovals";
 import AdminDisputes from "./admin/AdminDisputes";
+import AdminCategories from "./admin/AdminCategories";
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("Overview");
@@ -12,6 +13,7 @@ export default function AdminDashboard() {
     if (tab === "Users") return <AdminUsers />;
     if (tab === "Approvals") return <AdminApprovals />;
     if (tab === "Disputes") return <AdminDisputes />;
+    if (tab === "Categories") return <AdminCategories />;
     return <AdminOverview />;
   };
 
