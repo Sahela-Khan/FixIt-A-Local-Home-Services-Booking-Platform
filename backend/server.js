@@ -9,6 +9,7 @@ const bookingRoutes = require("./routes/bookingRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const providerRoutes = require("./routes/providerRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const disputeRoutes = require("./routes/disputeRoutes");
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/provider", providerRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/disputes", disputeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

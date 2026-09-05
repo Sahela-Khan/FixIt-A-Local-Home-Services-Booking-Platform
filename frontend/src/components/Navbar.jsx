@@ -31,12 +31,20 @@ export default function Navbar() {
       {isAuthenticated && (
         <div className="flex items-center gap-4">
           {canChat && (
-            <Link
-              className="border-b-2 border-transparent px-[0.2rem] py-[0.3rem] text-[0.92rem] font-semibold text-white no-underline hover:border-brand"
-              to="/chat"
-            >
-              Messages
-            </Link>
+            <>
+              <Link
+                className="border-b-2 border-transparent px-[0.2rem] py-[0.3rem] text-[0.92rem] font-semibold text-white no-underline hover:border-brand"
+                to="/chat"
+              >
+                Messages
+              </Link>
+              <Link
+                className="border-b-2 border-transparent px-[0.2rem] py-[0.3rem] text-[0.92rem] font-semibold text-white no-underline hover:border-brand"
+                to="/disputes"
+              >
+                {user?.role === "provider" ? "Complaints" : "Help"}
+              </Link>
+            </>
           )}
           <span className="flex items-center gap-2 text-[0.92rem]">
             {user?.name}

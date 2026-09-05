@@ -8,6 +8,7 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Chat from "./pages/Chat";
+import Disputes from "./pages/Disputes";
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -59,6 +60,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={["customer", "provider"]}>
               <Chat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/disputes"
+          element={
+            <ProtectedRoute allowedRoles={["customer", "provider"]}>
+              <Disputes />
             </ProtectedRoute>
           }
         />
