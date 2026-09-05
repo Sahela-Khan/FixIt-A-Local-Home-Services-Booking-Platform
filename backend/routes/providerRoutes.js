@@ -8,6 +8,7 @@ router.use(auth, role("provider"));
 router.post("/services", providerController.createListing);
 router.get("/services", providerController.getMyListings);
 router.put("/services/:id", providerController.updateListing);
+router.delete("/services/:id", providerController.deleteListing);
 
 router.put("/availability", providerController.setAvailability);
 router.put("/profile", providerController.setupProfile);

@@ -13,6 +13,9 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const refundRequestRoutes = require("./routes/refundRequestRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const disputeRoutes = require("./routes/disputeRoutes");
+const couponRoutes = require("./routes/couponRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 
 const app = express();
 
@@ -38,6 +41,9 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/refund-requests", refundRequestRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/disputes", disputeRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/categories", categoryRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

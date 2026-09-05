@@ -56,11 +56,30 @@ exports.updateListing = async (req, res) => {
     if (estDurationMins !== undefined) listing.estDurationMins = estDurationMins;
     if (isActive !== undefined) listing.isActive = isActive;
 
+    // Any edit requires a fresh admin approval — otherwise an already-approved
+    // listing could be silently changed into something that was never reviewed.
+    listing.approvalStatus = "pending";
+
     await listing.save();
     return res.status(200).json({ listing });
   } catch (err) {
     console.error("updateListing error:", err);
     return res.status(500).json({ message: "Server error while updating listing." });
+  }
+};
+
+// @desc  Delete a listing owned by the logged-in provider
+// @route DELETE /api/provider/services/:id
+exports.deleteListing = async (req, res) => {
+  try {
+    const listing = await Service.findOne({ _id: req.params.id, provider: req.user.id });
+    if (!listing) return res.status(404).json({ message: "Listing not found." });
+
+    await listing.deleteOne();
+    return res.status(200).json({ message: "Listing deleted successfully." });
+  } catch (err) {
+    console.error("deleteListing error:", err);
+    return res.status(500).json({ message: "Server error while deleting listing." });
   }
 };
 

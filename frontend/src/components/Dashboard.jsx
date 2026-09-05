@@ -27,7 +27,7 @@ function refundHintFor(booking, partialRefundPercent) {
 }
 
 export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,6 +96,9 @@ export default function Dashboard({ setActiveTab, reviewCount = 0 }) {
       setCancelTarget(null);
       setExpandedId(null);
       loadBookings();
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
       if (res.data?.message) {
         showMessage("Booking cancelled", res.data.message);
       }

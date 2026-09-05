@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
-import { ClipboardList, CheckCircle2, Clock, Wallet } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, Wallet, Pencil, Trash2, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import ComingSoon from "./ComingSoon";
-import featureFlags from "../config/featureFlags";
 
 const statusColors = {
   online: "bg-green-500",
@@ -45,6 +43,7 @@ export default function ProviderOverview() {
   const [showListingForm, setShowListingForm] = useState(false);
   const [listingForm, setListingForm] = useState({ title: "", category: "", price: "", estDurationMins: "", description: "" });
   const [savingListing, setSavingListing] = useState(false);
+  const [editingId, setEditingId] = useState(null); // null = create mode, else listing _id
   const [confirmingCashId, setConfirmingCashId] = useState(null);
 
   const availability = user?.providerProfile?.availability || "offline";
@@ -120,7 +119,8 @@ export default function ProviderOverview() {
     }
   };
 
-  const handleCreateListing = async (e) => {
+  // ---------- LISTING CRUD ----------
+  const handleCreateOrUpdateListing = async (e) => {
     e.preventDefault();
     if (!listingForm.title || !listingForm.category || !listingForm.price) {
       alert("Title, category and price are required.");
@@ -128,21 +128,61 @@ export default function ProviderOverview() {
     }
     setSavingListing(true);
     try {
-      await api.post("/provider/services", {
+      const payload = {
         ...listingForm,
         price: Number(listingForm.price),
         estDurationMins: listingForm.estDurationMins ? Number(listingForm.estDurationMins) : undefined,
-      });
+      };
+
+      if (editingId) {
+        // Update existing listing
+        await api.put(`/provider/services/${editingId}`, payload);
+      } else {
+        // Create new listing
+        await api.post("/provider/services", payload);
+      }
+
+      // Reset form and refresh
       setListingForm({ title: "", category: "", price: "", estDurationMins: "", description: "" });
+      setEditingId(null);
       setShowListingForm(false);
       loadAll();
     } catch (err) {
-      alert(err.response?.data?.message || "Could not create listing.");
+      alert(err.response?.data?.message || (editingId ? "Could not update listing." : "Could not create listing."));
     } finally {
       setSavingListing(false);
     }
   };
 
+  const handleEdit = (listing) => {
+    setListingForm({
+      title: listing.title,
+      category: listing.category,
+      description: listing.description || "",
+      price: listing.price.toString(),
+      estDurationMins: listing.estDurationMins ? listing.estDurationMins.toString() : "",
+    });
+    setEditingId(listing._id);
+    setShowListingForm(true);
+  };
+
+  const handleDelete = async (listingId) => {
+    if (!window.confirm("Are you sure you want to delete this listing?")) return;
+    try {
+      await api.delete(`/provider/services/${listingId}`);
+      loadAll();
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not delete listing.");
+    }
+  };
+
+  const cancelEdit = () => {
+    setListingForm({ title: "", category: "", price: "", estDurationMins: "", description: "" });
+    setEditingId(null);
+    setShowListingForm(false);
+  };
+
+  // ---------- RENDER ----------
   return (
     <div className="p-8">
       {/* Greeting header */}
@@ -235,20 +275,12 @@ export default function ProviderOverview() {
                     <p className="text-sm text-slate-500">📅 {b.date} ⏰ {b.time} · Status: {b.status}</p>
                   </div>
                   {nextStatus[b.status] && (
-                    // Feature 5 — Real-Time Job Status Tracker. Held back for
-                    // Sprint 3 (see src/config/featureFlags.js). Booking
-                    // acceptance (above) is unaffected — jobs will simply stay
-                    // at "Confirmed" until this flag is turned on.
-                    featureFlags.statusTracker ? (
-                      <button
-                        onClick={() => advanceStatus(b)}
-                        className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
-                      >
-                        Mark {nextStatus[b.status]}
-                      </button>
-                    ) : (
-                      <ComingSoon compact />
-                    )
+                    <button
+                      onClick={() => advanceStatus(b)}
+                      className="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    >
+                      Mark {nextStatus[b.status]}
+                    </button>
                   )}
                 </div>
               ))}
@@ -300,31 +332,44 @@ export default function ProviderOverview() {
             )}
           </div>
 
-          {/* My service listings */}
+          {/* My service listings with Edit & Delete */}
           <div className="bg-white rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-semibold">My service listings</h3>
               <button
-                onClick={() => setShowListingForm(!showListingForm)}
+                onClick={() => {
+                  if (showListingForm && editingId) {
+                    // If editing, cancel first
+                    cancelEdit();
+                  } else {
+                    setShowListingForm(!showListingForm);
+                    if (!showListingForm) {
+                      setEditingId(null);
+                      setListingForm({ title: "", category: "", price: "", estDurationMins: "", description: "" });
+                    }
+                  }
+                }}
                 className="text-sm font-semibold text-orange-500"
               >
-                {showListingForm ? "Close" : "+ Add listing"}
+                {showListingForm ? (editingId ? "Cancel" : "Close") : "+ Add listing"}
               </button>
             </div>
 
             {showListingForm && (
-              <form onSubmit={handleCreateListing} className="border rounded-lg p-3 mb-4 space-y-2">
+              <form onSubmit={handleCreateOrUpdateListing} className="border rounded-lg p-3 mb-4 space-y-2">
                 <input
                   placeholder="Title (e.g. AC Repair Service)"
                   value={listingForm.title}
                   onChange={(e) => setListingForm({ ...listingForm, title: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2 text-sm"
+                  required
                 />
                 <input
                   placeholder="Category (e.g. AC Repair)"
                   value={listingForm.category}
                   onChange={(e) => setListingForm({ ...listingForm, category: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2 text-sm"
+                  required
                 />
                 <div className="flex gap-2">
                   <input
@@ -333,6 +378,8 @@ export default function ProviderOverview() {
                     value={listingForm.price}
                     onChange={(e) => setListingForm({ ...listingForm, price: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm"
+                    required
+                    min="0"
                   />
                   <input
                     type="number"
@@ -340,6 +387,7 @@ export default function ProviderOverview() {
                     value={listingForm.estDurationMins}
                     onChange={(e) => setListingForm({ ...listingForm, estDurationMins: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm"
+                    min="0"
                   />
                 </div>
                 <textarea
@@ -349,13 +397,24 @@ export default function ProviderOverview() {
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                   rows={2}
                 />
-                <button
-                  type="submit"
-                  disabled={savingListing}
-                  className="w-full bg-orange-500 text-white font-semibold py-2 rounded-lg disabled:opacity-60"
-                >
-                  {savingListing ? "Saving..." : "Create listing"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={savingListing}
+                    className="flex-1 bg-orange-500 text-white font-semibold py-2 rounded-lg disabled:opacity-60"
+                  >
+                    {savingListing ? "Saving..." : editingId ? "Update Listing" : "Create listing"}
+                  </button>
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="px-4 border border-slate-300 text-slate-600 font-semibold py-2 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </form>
             )}
 
@@ -363,21 +422,38 @@ export default function ProviderOverview() {
             <div className="space-y-2">
               {listings.map((l) => (
                 <div key={l._id} className="border rounded-lg p-3 flex justify-between items-center">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-semibold">{l.title}</p>
                     <p className="text-sm text-slate-500">{l.category} · ৳ {l.price}</p>
+                    {l.description && <p className="text-sm text-slate-500 truncate">{l.description}</p>}
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      l.approvalStatus === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : l.approvalStatus === "rejected"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    {l.approvalStatus}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        l.approvalStatus === "approved"
+                          ? "bg-green-100 text-green-700"
+                          : l.approvalStatus === "rejected"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
+                    >
+                      {l.approvalStatus.charAt(0).toUpperCase() + l.approvalStatus.slice(1)}
+                    </span>
+                    <button
+                      onClick={() => handleEdit(l)}
+                      className="text-slate-400 hover:text-slate-600 transition"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(l._id)}
+                      className="text-red-400 hover:text-red-600 transition"
+                      title="Delete"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

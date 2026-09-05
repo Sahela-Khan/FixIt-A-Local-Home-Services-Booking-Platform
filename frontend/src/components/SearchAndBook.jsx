@@ -8,7 +8,7 @@ const categories = ["All", "Cleaning", "Plumbing", "AC Repair", "Painting", "Ele
 const maxPossiblePrice = 5000;
 
 export default function SearchAndBook() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [services, setServices] = useState([]);
   const [locations, setLocations] = useState(["All"]);
@@ -18,6 +18,7 @@ export default function SearchAndBook() {
   const [category, setCategory] = useState("All");
   const [location, setLocation] = useState("All");
   const [maxPrice, setMaxPrice] = useState(maxPossiblePrice);
+  const [sortBy, setSortBy] = useState("newest");
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   const [expandedServiceId, setExpandedServiceId] = useState(null);
@@ -47,7 +48,7 @@ export default function SearchAndBook() {
   const loadServices = () => {
     setLoading(true);
     api
-      .get("/services", { params: { keyword, category, location, maxPrice } })
+      .get("/services", { params: { keyword, category, location, maxPrice, sortBy } })
       .then((res) => setServices(res.data.services))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -79,7 +80,7 @@ export default function SearchAndBook() {
     const t = setTimeout(loadServices, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword, category, location, maxPrice]);
+  }, [keyword, category, location, maxPrice, sortBy]);
 
   const toggleSaved = async (providerId) => {
     try {
@@ -111,13 +112,16 @@ export default function SearchAndBook() {
     setFormError("");
     setBooking(true);
     try {
-      await api.post("/bookings", {
+      const res = await api.post("/bookings", {
         serviceId: service._id,
         date,
         time,
         address,
         notes,
       });
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
       setConfirmedFor(service);
       setExpandedServiceId(null);
     } catch (err) {
@@ -174,13 +178,16 @@ export default function SearchAndBook() {
     setManualError("");
     setManualBooking(true);
     try {
-      await api.post("/bookings", {
+      const res = await api.post("/bookings", {
         serviceId: matchedService._id,
         date: manualDate,
         time: manualTime,
         address: manualAddress,
         notes: manualNotes,
       });
+      if (res.data?.loyaltyPoints !== undefined) {
+        updateUser({ loyaltyPoints: res.data.loyaltyPoints });
+      }
       setManualConfirmed(matchedService);
       loadServices();
     } catch (err) {
@@ -258,6 +265,17 @@ export default function SearchAndBook() {
             className="flex-1"
           />
         </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm bg-white"
+        >
+          <option value="newest">Newest</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="rating">Rating</option>
+        </select>
       </div>
 
       <div className="flex gap-2 mb-5">
