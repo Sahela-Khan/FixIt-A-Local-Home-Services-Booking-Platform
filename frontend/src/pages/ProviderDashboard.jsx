@@ -27,7 +27,7 @@ export default function ProviderDashboard() {
       case "reviews":
         return <ProviderReviews />;
       case "notifications":
-        return <Notifications />;
+        return <Notifications setActiveTab={setActiveTab} />;
       case "chat":
         return <Chat />;
       default:
